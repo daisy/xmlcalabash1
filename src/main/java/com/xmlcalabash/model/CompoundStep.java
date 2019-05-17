@@ -472,7 +472,7 @@ public class CompoundStep extends Step {
 
 
                 if (!ok) {
-                    error(XProcException.staticError(6, "Unbound primary output port on last step: " + getName()));
+                    error(XProcException.staticError(6, node, "Unbound primary output port on last step: " + getName()));
                 }
             }
         }

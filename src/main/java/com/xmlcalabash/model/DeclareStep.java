@@ -132,7 +132,16 @@ public class DeclareStep extends CompoundStep implements DeclarationScope {
     public DeclareStep getDeclaration(QName type) {
         DeclareStep decl = null;
         if (parentScope != null)
-            decl = parentScope.getDeclaration(type);
+            try {
+                decl = parentScope.getDeclaration(type);
+            } catch (XProcException e) {
+                if (XProcConstants.staticError(44).equals(e.getErrorCode())) {
+                    // step was not found
+                    // throw same exception but with more precise location info
+                    throw XProcException.staticError(44, node, "Unexpected step name: " + type);
+                } else
+                    throw e;
+            }
         for (PipelineLibrary lib : importedLibs) {
             DeclareStep d = lib.getDeclaration(type);
             if (d != null) {

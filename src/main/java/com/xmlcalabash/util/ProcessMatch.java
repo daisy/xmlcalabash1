@@ -106,7 +106,7 @@ public class ProcessMatch extends TreeWriter {
                     23, node,
                     new RuntimeException("Syntax error in match pattern: \"" + match.getString() + "\"", e));
             } else {
-                throw new XProcException(e);
+                throw new XProcException(node, e);
             }
         }
     }

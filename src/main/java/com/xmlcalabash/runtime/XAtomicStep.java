@@ -919,7 +919,16 @@ public class XAtomicStep extends XStep {
                     if ("http://www.w3.org/2005/xqt-errors".equals(xe.getErrorCodeNamespace()) && "XPDY0002".equals(xe.getErrorCodeLocalPart())) {
                         throw XProcException.dynamicError(26, step.getNode(), "Expression refers to context when none is available: " + xpath);
                     } else {
-                        throw saue;
+                        Throwable cause = sae.getCause();
+                        if (cause != null)
+                            throw new XProcException(
+                                this,
+                                sae,
+                                XProcException.fromException(cause)
+                                              .rebase(null, new RuntimeException().getStackTrace())
+                                              .rebase(this));
+                        else
+                            throw saue;
                     }
 
                 } else {
@@ -930,8 +939,10 @@ public class XAtomicStep extends XStep {
             if (S9apiUtils.xpathSyntaxError(sae)) {
                 throw XProcException.dynamicError(23, step.getNode(), sae.getCause().getMessage());
             } else {
-                throw new XProcException(sae);
+                throw new XProcException(this, sae);
             }
+        } catch (SaxonApiUncheckedException saue) {
+            throw new XProcException(this, saue);
         }
 
         return results;

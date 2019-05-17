@@ -105,9 +105,13 @@ public class XChoose extends XCompoundStep {
         for (XStep step : subpipeline) {
             if (step instanceof XWhen) {
                 XWhen when = (XWhen) step;
-                if (when.shouldRun()) {
-                    xstep = when;
-                    break;
+                try {
+                    if (when.shouldRun()) {
+                        xstep = when;
+                        break;
+                    }
+                } catch (Exception e) {
+                    throw new XProcException(when, e);
                 }
             } else {
                 // Must be an otherwise
