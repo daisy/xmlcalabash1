@@ -108,7 +108,7 @@ public class XTry extends XCompoundStep {
             xgroup.run();
         } catch (Exception xe) {
             
-            logger.debug("p:try: caught error: " + xe.toString());
+            logger.trace("p:try: caught error: " + xe.toString());
             logger.trace("", xe);
             
             TreeWriter treeWriter = new TreeWriter(runtime);
