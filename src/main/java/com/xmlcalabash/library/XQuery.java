@@ -192,7 +192,7 @@ public class XQuery extends DefaultStep {
                             tree.endDocument();
                             node = tree.getResult();
                         } else {
-                            throw new XProcException(step.getStep(), "p:xquery returned non-XML result", e.getCause());
+                            throw new XProcException(step, "p:xquery returned non-XML result", e.getCause());
                         }
                     }
                 }

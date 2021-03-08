@@ -105,8 +105,8 @@ public class Error extends DefaultStep {
         cns = errorCode.getNamespaceURI();
         
         XProcException e = (doc == null) ?
-            new XProcException(step.getStep(), errorCode) :
-            new XProcException(step.getStep(), errorCode, doc, doc.getStringValue());
+            new XProcException(step, errorCode) :
+            new XProcException(step, errorCode, doc.getStringValue());
         
         TreeWriter treeWriter = new TreeWriter(runtime);
         treeWriter.startDocument(step.getNode().getBaseURI());
@@ -120,7 +120,7 @@ public class Error extends DefaultStep {
         if (doc != null) {
             treeWriter.addSubtree(doc);
         }
-        XProcException.serializeLocator(e.getLocator(), treeWriter);
+        XProcException.serializeLocation(e.getLocation(), treeWriter);
         treeWriter.addEndElement();
         treeWriter.endDocument();
 

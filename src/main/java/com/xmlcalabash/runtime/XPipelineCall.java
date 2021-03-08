@@ -22,7 +22,6 @@ public class XPipelineCall extends XAtomicStep {
 
     public XPipelineCall(XProcRuntime runtime, Step step, XCompoundStep parent) {
         super(runtime, step, parent);
-        this.parent = parent;
     }
 
     public void setDeclaration(DeclareStep decl) {
@@ -44,7 +43,7 @@ public class XPipelineCall extends XAtomicStep {
         }
 
         XRootStep root = new XRootStep(runtime);
-        XPipeline newstep = new XPipeline(runtime, decl, root);
+        XPipeline newstep = new XPipeline(runtime, decl, root, getLocation());
 
         newstep.instantiate(decl);
 
@@ -93,15 +92,9 @@ public class XPipelineCall extends XAtomicStep {
         }
 
         runtime.start(this);
-        try {
-            XProcMessageListenerHelper.openStep(runtime, this);
-        } catch (Throwable e) {
-            throw handleException(e);
-        }
+        XProcMessageListenerHelper.openStep(runtime, this);
         try {
             newstep.run();
-        } catch (Throwable e) {
-            throw handleException(e);
         } finally {
             for (XdmNode doc : newstep.errors()) {
                 reportError(doc);

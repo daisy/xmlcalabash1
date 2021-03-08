@@ -274,6 +274,8 @@ public class Eval extends DefaultStep {
                 }
             }
 
+        } catch (XProcException e) {
+            throw e.rebaseOnto(step.getLocation());
         } finally {
             if (pipeline != null) {
                 for (XdmNode doc : pipeline.errors()) {

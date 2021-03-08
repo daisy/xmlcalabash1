@@ -94,11 +94,7 @@ public class XTry extends XCompoundStep {
             }
         }
 
-        try {
-            XProcMessageListenerHelper.openStep(runtime, this);
-        } catch (Throwable e) {
-            throw handleException(e);
-        }
+        XProcMessageListenerHelper.openStep(runtime, this);
         try {
             xgroup.run();
         } catch (Exception xe) {

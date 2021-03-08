@@ -80,6 +80,8 @@ public class XAtomicStep extends XStep {
     public XAtomicStep(XProcRuntime runtime, Step step, XCompoundStep parent) {
         super(runtime, step);
         this.parent = parent;
+        if (parent != null)
+            this.parentLocation = parent.getLocation();
     }
 
     public XCompoundStep getParent() {
@@ -389,15 +391,22 @@ public class XAtomicStep extends XStep {
 
         runtime.start(this);
         try {
-            try {
-                XProcMessageListenerHelper.openStep(runtime, this);
-            } catch (Throwable e) {
-                throw handleException(e);
-            }
+            XProcMessageListenerHelper.openStep(runtime, this);
             try {
                 xstep.run();
-            } catch (Throwable e) {
-                throw handleException(e);
+            } catch (RuntimeException e) {
+                // If an unexpected exception happens while running a step, log the XProc stack
+                // trace in order to aid debugging. With "unexpected exception" we mean an exception
+                // that is not a XProcException or SaxonApiException: these are not allowed to
+                // happen (if they do it's due to a bug).
+                if (!(e instanceof XProcException)) {
+                    // creating XProcException only to get the nice XProc stack trace
+                    logger.error("An unexpected runtime exception happened: "
+                                 + XProcException.javaError(e, 1)
+                                                 .rebaseOnto(getLocation())
+                                                 .toString());
+                }
+                throw e;
             } finally {
                 runtime.getMessageListener().closeStep();
             }
@@ -605,7 +614,7 @@ public class XAtomicStep extends XStep {
                 }
                 doc = pipe.read();
                 if (pipe.moreDocuments()) {
-                    throw XProcException.dynamicError(step, 8, "More than one document in context for parameter '" + var.getName() + "'");
+                    throw XProcException.dynamicError(this, 8, "More than one document in context for parameter '" + var.getName() + "'");
                 }
             }
         } catch (SaxonApiException sae) {

@@ -273,24 +273,25 @@ public class XSLT extends DefaultStep {
                     if (e instanceof TerminationException) {
                         message = catchMessages.getTerminatingMessage().toString();
                     }
-                    final SourceLocator[] frames = XProcException.getLocator((TransformerException)e);
+                    final SourceLocator[] frames = XProcException.getLocation((TransformerException)e);
                     Throwable cause = e.getCause();
                     if (cause != null) {
                         throw new XProcException(message, XProcException.javaError(cause, 0)) {
                             @Override
-                            public SourceLocator[] getLocator() {
+                            public SourceLocator[] getLocation() {
                                 return frames; }};
                     } else
                         // passing e in order to provide some more details
                         // (but not wrapping it in an XProcException so that it doesn't appear in locator)
                         throw new XProcException(message, e) {
                             @Override
-                            public SourceLocator[] getLocator() {
+                            public SourceLocator[] getLocation() {
                                 return frames; }};
                 } else
                     throw XProcException.javaError(sae, 0);
             }
         } catch (XProcException e) {
+            e = e.rebaseOnto(step.getLocation());
             step.reportError(e);
             throw e;
         } finally {
@@ -348,7 +349,7 @@ public class XSLT extends DefaultStep {
                     tree.endDocument();
                     resultPipe.write(tree.getResult());
                 } else {
-                    throw new XProcException(step.getStep(), "p:xslt returned non-XML result", e.getCause());
+                    throw new XProcException(step, "p:xslt returned non-XML result", e.getCause());
                 }
             }
         }
@@ -456,7 +457,7 @@ public class XSLT extends DefaultStep {
                     tree.endDocument();
                     secondaryPipe.write(tree.getResult());
                 } else {
-                    throw new XProcException(step.getStep(), "p:xslt returned non-XML secondary result", e.getCause());
+                    throw new XProcException(step, "p:xslt returned non-XML secondary result", e.getCause());
                 }
             }
         }

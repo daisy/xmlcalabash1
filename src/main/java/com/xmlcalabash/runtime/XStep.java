@@ -9,6 +9,7 @@ import org.slf4j.Logger;
 import java.util.Hashtable;
 import java.util.Set;
 import java.util.HashSet;
+import javax.xml.transform.SourceLocator;
 
 import com.xmlcalabash.core.XProcException;
 import com.xmlcalabash.core.XProcRuntime;
@@ -37,6 +38,9 @@ public abstract class XStep implements XProcRunnable {
     private Hashtable<String, Hashtable<QName, RuntimeValue>> parameters = new Hashtable<String, Hashtable<QName, RuntimeValue>> ();
     protected XCompoundStep parent = null;
     protected Hashtable<QName,RuntimeValue> inScopeOptions = new Hashtable<QName,RuntimeValue> ();
+    /* the next frames in the call stack */
+    private static final SourceLocator[] EMPTY_LOCATION = new SourceLocator[]{};
+    protected SourceLocator[] parentLocation = EMPTY_LOCATION;
 
     public XStep(XProcRuntime runtime, Step step) {
         this.runtime = runtime;
@@ -305,19 +309,14 @@ public abstract class XStep implements XProcRunnable {
         runtime.info(this, node, message);
     }
 
-    protected XProcException handleException(Throwable e) {
-        XProcException xe = (e instanceof XProcException) ?
-            (XProcException)e :
-            XProcException.javaError(e, 1, new RuntimeException().getStackTrace(), 1);
-        if (getRootStep(xe.getStep()) != getRootStep(getStep()))
-            xe = xe.rebaseOnto(getStep());
-        return xe;
-    }
-    
-    private static Step getRootStep(Step s) {
-        if (s != null)
-            while (s.getParent() != null)
-                s = s.getParent();
-        return s;
+    public SourceLocator[] getLocation() {
+        if (step == null)
+            return parentLocation;
+        SourceLocator[] location = new SourceLocator[parentLocation.length + 1]; {
+            location[0] = XProcException.getLocator(step);
+            for (int i = 0; i < parentLocation.length; i++)
+                location[i + 1] = parentLocation[i];
+        }
+        return location;
     }
 }

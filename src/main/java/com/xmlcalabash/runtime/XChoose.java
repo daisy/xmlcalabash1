@@ -133,11 +133,7 @@ public class XChoose extends XCompoundStep {
         }
 
         try {
-            try {
-                XProcMessageListenerHelper.openStep(runtime, this);
-            } catch (Throwable e) {
-                throw handleException(e);
-            }
+            XProcMessageListenerHelper.openStep(runtime, this);
             try {
                 xstep.run();
             } finally {
