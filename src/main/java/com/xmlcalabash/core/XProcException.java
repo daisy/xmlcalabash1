@@ -683,7 +683,7 @@ public class XProcException extends RuntimeException {
         return printEnclosedLocation(new SourceLocator[]{});
     }
 
-    private static void serializeLocator(SourceLocator[] locator, TreeWriter writer) {
+    public static void serializeLocator(SourceLocator[] locator, TreeWriter writer) {
         boolean empty = true;
         for (SourceLocator l : locator) {
             if (l.getSystemId() != null || l.getLineNumber() > 0) {

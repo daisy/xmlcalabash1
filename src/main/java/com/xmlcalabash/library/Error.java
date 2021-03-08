@@ -120,6 +120,7 @@ public class Error extends DefaultStep {
         if (doc != null) {
             treeWriter.addSubtree(doc);
         }
+        XProcException.serializeLocator(e.getLocator(), treeWriter);
         treeWriter.addEndElement();
         treeWriter.endDocument();
 
