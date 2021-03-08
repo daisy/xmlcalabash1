@@ -29,6 +29,7 @@ import com.xmlcalabash.model.NamespaceBinding;
 import com.xmlcalabash.model.DeclareStep;
 import com.xmlcalabash.model.Option;
 import com.xmlcalabash.model.SequenceType;
+import com.xmlcalabash.util.TreeWriter;
 import com.xmlcalabash.util.XProcMessageListenerHelper;
 import net.sf.saxon.om.InscopeNamespaceResolver;
 import net.sf.saxon.om.NameChecker;
@@ -434,6 +435,14 @@ public class XAtomicStep extends XStep {
         parent.reportError(doc);
     }
 
+    public void reportError(XProcException exception) {
+        TreeWriter treeWriter = new TreeWriter(runtime);
+        treeWriter.startDocument(getNode().getBaseURI());
+        exception.serialize(treeWriter);
+        treeWriter.endDocument();
+        reportError(treeWriter.getResult());
+    }
+    
     private void parseParameterNode(XProcStep impl, XdmNode pnode) {
         String value = pnode.getAttributeValue(_value);
 

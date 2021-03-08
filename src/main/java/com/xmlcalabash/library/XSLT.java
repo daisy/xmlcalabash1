@@ -293,6 +293,9 @@ public class XSLT extends DefaultStep {
                 } else
                     throw XProcException.javaError(sae, 0);
             }
+        } catch (XProcException e) {
+            step.reportError(e);
+            throw e;
         } finally {
             config.setOutputURIResolver(uriResolver);
             config.setCollectionFinder(collectionFinder);
@@ -479,12 +482,9 @@ public class XSLT extends DefaultStep {
             treeWriter.addEndElement();
             treeWriter.endDocument();
 
-            step.reportError(treeWriter.getResult());
-
             if (!terminate)
                 step.info(step.getNode(), content.toString());
-
-            if (terminate)
+            else
                 terminatingMessage = content;
         }
 
