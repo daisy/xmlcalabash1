@@ -30,6 +30,7 @@ public class XTry extends XCompoundStep {
     private static final QName _line = new QName("", "line");
     private static final QName _column = new QName("", "column");
     private static final QName _code = new QName("", "code");
+    private boolean inCatch = false;
     private Vector<XdmNode> errors = new Vector<XdmNode> ();
 
     public XTry(XProcRuntime runtime, Step step, XCompoundStep parent) {
@@ -145,8 +146,10 @@ public class XTry extends XCompoundStep {
                 }
             }
 
+            inCatch = true;
             xcatch.run();
         } finally {
+            inCatch = false;
             runtime.getMessageListener().closeStep();
         }
     }
@@ -197,6 +200,11 @@ public class XTry extends XCompoundStep {
     }
 
     public void reportError(XdmNode doc) {
-        errors.add(doc);
+        if (inCatch) {
+            // if the error is coming from the catch group, report to parent
+            super.reportError(doc);
+        } else {
+            errors.add(doc);
+        }
     }
 }
