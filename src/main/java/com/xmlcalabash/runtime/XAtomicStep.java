@@ -398,7 +398,7 @@ public class XAtomicStep extends XStep {
                 // If an unexpected exception happens while running a step, log the XProc stack
                 // trace in order to aid debugging. With "unexpected exception" we mean an exception
                 // that is not a XProcException or SaxonApiException: these are not allowed to
-                // happen (if they do it's due to a bug).
+                // happen (if they do it's due to a bug), and are not caught by p:try.
                 if (!(e instanceof XProcException)) {
                     // creating XProcException only to get the nice XProc stack trace
                     logger.error("An unexpected runtime exception happened: "

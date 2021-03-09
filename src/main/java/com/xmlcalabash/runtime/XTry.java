@@ -12,7 +12,6 @@ import net.sf.saxon.om.StructuredQName;
 import net.sf.saxon.s9api.SaxonApiException;
 import net.sf.saxon.s9api.XdmNode;
 import net.sf.saxon.s9api.QName;
-import net.sf.saxon.trans.XPathException;
 
 import java.util.Vector;
 
@@ -97,7 +96,7 @@ public class XTry extends XCompoundStep {
         XProcMessageListenerHelper.openStep(runtime, this);
         try {
             xgroup.run();
-        } catch (Exception xe) {
+        } catch (XProcException xe) {
             
             logger.trace("p:try: caught error: " + xe.toString());
             logger.trace("", xe);
@@ -120,7 +119,7 @@ public class XTry extends XCompoundStep {
 
             if (!reported) {
                 // Hey, no one reported this exception. We better do it.
-                serializeError(xe, runtime.runningStep(), treeWriter);
+                xe.serialize(treeWriter);
             }
 
             treeWriter.addEndElement();
@@ -148,51 +147,6 @@ public class XTry extends XCompoundStep {
             inCatch = false;
             runtime.getMessageListener().closeStep();
         }
-    }
-
-    private static void serializeError(Throwable xe, XStep step, TreeWriter treeWriter) {
-        if (xe instanceof XProcException) {
-            ((XProcException)xe).serialize(treeWriter);
-            return;
-        }
-
-        treeWriter.addStartElement(c_error);
-
-        String message = xe.getMessage();
-
-        if (xe instanceof XPathException) {
-            XPathException xxx = (XPathException) xe;
-            StructuredQName qCode = xxx.getErrorCodeQName();
-            if (qCode != null) {
-                treeWriter.addNamespace(qCode.getPrefix(), qCode.getNamespaceBinding().getURI());
-                treeWriter.addAttribute(_code, qCode.getDisplayName());
-            }
-
-            Throwable underlying = xe.getCause();
-            if (underlying != null) {
-                message = underlying.toString();
-            }
-        }
-
-        if (step != null && step.getNode() != null) {
-            XdmNode node = step.getNode();
-            if (node.getBaseURI() != null) {
-                treeWriter.addAttribute(_href, node.getBaseURI().toString());
-            }
-            if (node.getLineNumber() > 0) {
-                treeWriter.addAttribute(_line, ""+node.getLineNumber());
-            }
-            if (node.getColumnNumber() > 0) {
-                treeWriter.addAttribute(_column, ""+node.getColumnNumber());
-            }
-        }
-
-        treeWriter.startContent();
-        
-        if (message != null)
-            treeWriter.addText(message);
-
-        treeWriter.addEndElement();
     }
 
     public void reportError(XdmNode doc) {

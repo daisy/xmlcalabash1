@@ -1014,11 +1014,7 @@ public class XProcRuntime implements DeclarationScope {
 
     // ===========================================================
 
-    private Stack<XStep> runningSteps = new Stack<XStep>();
-
     public void start(XStep step) {
-        runningSteps.push(step);
-
         if (profile == null) {
             return;
         }
@@ -1060,13 +1056,7 @@ public class XProcRuntime implements DeclarationScope {
         profileWriter.startContent();
     }
 
-    public XStep runningStep() {
-        return runningSteps.peek();
-    }
-
     public void finish(XStep step) {
-        runningSteps.pop();
-
         if (profile == null) {
             return;
         }
