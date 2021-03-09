@@ -76,6 +76,8 @@ public class XProcException extends RuntimeException {
     private static final QName _line = new QName("", "line");
     private static final QName _column = new QName("", "column");
     private static final QName _code = new QName("", "code");
+    private static final QName _type = new QName("", "type");
+    private static final QName _name = new QName("", "name");
     private static final QName px_cause = new QName("px", NS_DAISY_PIPELINE_XPROC, "cause");
     private static final QName px_location = new QName("px", NS_DAISY_PIPELINE_XPROC, "location");
     private static final QName px_file = new QName("px", NS_DAISY_PIPELINE_XPROC, "file");
@@ -731,7 +733,7 @@ public class XProcException extends RuntimeException {
         return printEnclosedLocation(new SourceLocator[]{});
     }
 
-    public static void serializeLocation(SourceLocator[] location, TreeWriter writer) {
+    private static void serializeLocation(SourceLocator[] location, TreeWriter writer) {
         boolean empty = true;
         for (SourceLocator l : location) {
             if (l.getSystemId() != null || l.getLineNumber() > 0) {
@@ -762,6 +764,13 @@ public class XProcException extends RuntimeException {
             StructuredQName qCode = new StructuredQName(errorCode.getPrefix(), errorCode.getNamespaceURI(), errorCode.getLocalName());
             writer.addNamespace(qCode.getPrefix(), qCode.getNamespaceBinding().getURI());
             writer.addAttribute(_code, qCode.getDisplayName());
+        }
+        if (location[0] instanceof XProcLocator) {
+            Step step = ((XProcLocator)location[0]).step;
+            if (step != null) {
+                writer.addAttribute(_name, step.getName());
+                writer.addAttribute(_type, step.getType().toString());
+            }
         }
         if (location[0].getSystemId() != null)
             writer.addAttribute(_href, location[0].getSystemId());
