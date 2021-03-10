@@ -1507,7 +1507,9 @@ public class Parser {
             }
         } catch (XProcException xe) {
             if (XProcConstants.dynamicError(11).equals(xe.getErrorCode())) {
-                throw XProcException.staticError(52, node, xe.getCause(), "Cannot import: " + importURI.toASCIIString());
+                throw XProcException.staticError(
+                    52, node,
+                    new RuntimeException("Cannot import: " + importURI.toASCIIString(), xe.getCause()));
             } else {
                 throw xe;
             }
@@ -1868,7 +1870,9 @@ public class Parser {
             try {
                 TypeUtils.checkType(runtime, name, XProcConstants.xs_NCName,null);
             } catch (XProcException xe) {
-                throw new XProcException("Invalid name: \"" + name + "\". Step and port names must be NCNames.", xe.getCause());
+                throw new XProcException(
+                    new RuntimeException("Invalid name: \"" + name + "\". Step and port names must be NCNames.",
+                                         xe.getCause()));
             }
         }
         return name;

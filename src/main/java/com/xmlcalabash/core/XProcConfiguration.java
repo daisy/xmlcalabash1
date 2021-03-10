@@ -547,7 +547,7 @@ public class XProcConfiguration {
         try {
             return builder.build(source);
         } catch (SaxonApiException sae) {
-            throw new XProcException(XProcConstants.dynamicError(11), sae);
+            throw XProcException.dynamicError(11, sae);
         }
     }
 

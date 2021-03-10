@@ -167,9 +167,9 @@ public class ValidateJing extends DefaultStep {
                 throw XProcException.stepError(53, e);
             }
         } catch (SAXException e) {
-            throw new XProcException("SAX Exception", e);
+            throw new XProcException(new RuntimeException("SAX Exception", e));
         } catch (IOException e) {
-            throw new XProcException("IO Exception", e);
+            throw new XProcException(new RuntimeException("IO Exception", e));
         }
 
         result.write(doc); // At the moment, we don't get any augmentation

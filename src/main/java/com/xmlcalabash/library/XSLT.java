@@ -267,31 +267,36 @@ public class XSLT extends DefaultStep {
             try {
                 transformer.transform();
             } catch (SaxonApiException sae) {
-                final Throwable e = sae.getCause();
+                Throwable e = sae.getCause();
                 if (e instanceof TransformerException) {
-                    String message = e.getMessage();
+                    XdmNode message = null;
                     if (e instanceof TerminationException) {
-                        message = catchMessages.getTerminatingMessage().toString();
+                        message = catchMessages.getTerminatingMessage();
                     }
-                    final SourceLocator[] frames = XProcException.getLocation((TransformerException)e);
+                    TransformerException location = (TransformerException)e;
                     Throwable cause = e.getCause();
                     if (cause != null) {
-                        throw new XProcException(message, XProcException.javaError(cause, 0)) {
-                            @Override
-                            public SourceLocator[] getLocation() {
-                                return frames; }};
-                    } else
-                        // passing e in order to provide some more details
-                        // (but not wrapping it in an XProcException so that it doesn't appear in locator)
-                        throw new XProcException(message, e) {
-                            @Override
-                            public SourceLocator[] getLocation() {
-                                return frames; }};
+                        if (message != null)
+                            throw new XProcException(
+                                location,
+                                message,
+                                XProcException.fromException(cause)
+                                              .rebase(null, new RuntimeException().getStackTrace()));
+                        else
+                            throw new XProcException(
+                                location,
+                                e,
+                                XProcException.fromException(cause)
+                                              .rebase(null, new RuntimeException().getStackTrace()));
+                    } else if (message != null)
+                        throw new XProcException(location, message);
+                    else
+                        throw new XProcException(location, e);
                 } else
-                    throw XProcException.javaError(sae, 0);
+                    throw XProcException.fromException(sae);
             }
         } catch (XProcException e) {
-            e = e.rebaseOnto(step.getLocation());
+            e = e.rebase(step);
             step.reportError(e);
             throw e;
         } finally {
@@ -349,7 +354,7 @@ public class XSLT extends DefaultStep {
                     tree.endDocument();
                     resultPipe.write(tree.getResult());
                 } else {
-                    throw new XProcException(step, "p:xslt returned non-XML result", e.getCause());
+                    throw new XProcException(step, new RuntimeException("p:xslt returned non-XML result", e.getCause()));
                 }
             }
         }
@@ -457,7 +462,8 @@ public class XSLT extends DefaultStep {
                     tree.endDocument();
                     secondaryPipe.write(tree.getResult());
                 } else {
-                    throw new XProcException(step, "p:xslt returned non-XML secondary result", e.getCause());
+                    throw new XProcException(
+                        step, new RuntimeException("p:xslt returned non-XML secondary result", e.getCause()));
                 }
             }
         }

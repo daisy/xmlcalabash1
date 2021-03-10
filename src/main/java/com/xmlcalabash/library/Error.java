@@ -105,8 +105,8 @@ public class Error extends DefaultStep {
         cns = errorCode.getNamespaceURI();
         
         XProcException e = (doc == null) ?
-            new XProcException(step, errorCode) :
-            new XProcException(step, errorCode, doc.getStringValue());
+            new XProcException(errorCode, step, errorCode.getLocalName()) :
+            new XProcException(errorCode, step, doc);
         
         TreeWriter treeWriter = new TreeWriter(runtime);
         treeWriter.startDocument(step.getNode().getBaseURI());

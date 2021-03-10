@@ -139,7 +139,7 @@ public class CssFormatter extends DefaultStep {
             if (e.getCause() instanceof SaxonApiException) {
                 throw (SaxonApiException) e.getCause();
             }
-            throw new XProcException(step.getNode(), "Failed to style with CSS document", e);
+            throw new XProcException(step.getNode(), new RuntimeException("Failed to style with CSS document", e));
         }
     }
 }

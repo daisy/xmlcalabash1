@@ -601,11 +601,11 @@ public class XProcRuntime implements DeclarationScope {
                 throw new XProcException(errorCode, errorMessage);
             }
         } catch (FileNotFoundException ex) {
-            throw new XProcException(XProcConstants.dynamicError(9), ex);
+            throw XProcException.dynamicError(9, ex);
         } catch (URISyntaxException ex) {
-            throw new XProcException(XProcConstants.dynamicError(9), ex);
+            throw XProcException.dynamicError(9, ex);
         } catch (SaxonApiException ex) {
-            throw new XProcException(XProcConstants.dynamicError(9), ex);
+            throw XProcException.dynamicError(9, ex);
         }
 
         if (profile != null) {

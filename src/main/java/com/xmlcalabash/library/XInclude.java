@@ -468,7 +468,9 @@ public class XInclude extends DefaultStep implements ProcessMatchingNodes {
 
         if (fallback == null) {
             if (mostRecentException != null) {
-                throw new XProcException(step.getNode(), "XInclude resource error (" + href + ") and no fallback provided.", mostRecentException);
+                throw new XProcException(
+                    step.getNode(),
+                    new RuntimeException("XInclude resource error (" + href + ") and no fallback provided.", mostRecentException));
             } else {
                 throw new XProcException(step.getNode(), "XInclude resource error (" + href + ") and no fallback provided.");
             }

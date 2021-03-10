@@ -1,6 +1,7 @@
 package com.xmlcalabash.util;
 
 import com.xmlcalabash.core.XProcException;
+import com.xmlcalabash.core.XProcException.XProcLocator;
 import com.xmlcalabash.core.XProcMessageListener;
 import com.xmlcalabash.core.XProcRunnable;
 import net.sf.saxon.om.StructuredQName;
@@ -82,8 +83,9 @@ public class DefaultXProcMessageListener implements XProcMessageListener {
                 QName n = err.getErrorCode();
                 qCode = new StructuredQName(n.getPrefix(),n.getNamespaceURI(),n.getLocalName());
             }
-            if (err.getStep() != null) {
-                message = message + err.getStep() + ":";
+            if (loc instanceof XProcLocator) {
+                if (((XProcLocator)loc).getStep() != null)
+                    message = message + ((XProcLocator)loc).getStep() + ":";
             }
         }
 

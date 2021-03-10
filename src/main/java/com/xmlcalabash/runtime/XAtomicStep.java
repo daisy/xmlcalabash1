@@ -402,8 +402,8 @@ public class XAtomicStep extends XStep {
                 if (!(e instanceof XProcException)) {
                     // creating XProcException only to get the nice XProc stack trace
                     logger.error("An unexpected runtime exception happened: "
-                                 + XProcException.javaError(e, 1)
-                                                 .rebaseOnto(getLocation())
+                                 + XProcException.fromException(e)
+                                                 .rebase(getLocation(), new RuntimeException().getStackTrace())
                                                  .toString());
                 }
                 throw e;
@@ -614,7 +614,8 @@ public class XAtomicStep extends XStep {
                 }
                 doc = pipe.read();
                 if (pipe.moreDocuments()) {
-                    throw XProcException.dynamicError(this, 8, "More than one document in context for parameter '" + var.getName() + "'");
+                    throw XProcException.dynamicError(
+                        8, this, "More than one document in context for parameter '" + var.getName() + "'");
                 }
             }
         } catch (SaxonApiException sae) {
