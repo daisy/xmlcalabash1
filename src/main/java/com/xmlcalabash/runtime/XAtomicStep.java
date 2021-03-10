@@ -269,7 +269,7 @@ public class XAtomicStep extends XStep {
                             } else if (XProcConstants.c_param.equals(docelem.getNodeName())) {
                                 parseParameterNode(xstep,docelem);
                             } else {
-                                throw new XProcException(step.getNode(), docelem.getNodeName() + " found where c:param or c:param-set expected");
+                                throw new XProcException(step, docelem.getNodeName() + " found where c:param or c:param-set expected");
                             }
                         }
                     }

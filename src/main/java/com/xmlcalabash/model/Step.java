@@ -920,14 +920,14 @@ public class Step extends SourceArtifact {
         if (getExtensionAttribute(cx_depend) != null
             || getExtensionAttribute(cx_depends) != null
             || getExtensionAttribute(cx_dependson) != null) {
-            throw new XProcException(getNode(), "The correct spelling of the depends-on attribute is cx:depends-on.");
+            throw new XProcException(this, "The correct spelling of the depends-on attribute is cx:depends-on.");
         }
 
         String dependsOn = getExtensionAttribute(XProcConstants.cx_depends_on);
         if (dependsOn != null) {
             Step step = env.visibleStep(dependsOn);
             if (step == null) {
-                throw new XProcException(getNode(), "The value of cx:depends-on must be the name of an in-scope step: " + dependsOn);
+                throw new XProcException(this, "The value of cx:depends-on must be the name of an in-scope step: " + dependsOn);
             }
             addDependency(dependsOn);
         }

@@ -49,7 +49,8 @@ public class XTry extends XCompoundStep {
                 XCatch newstep = new XCatch(runtime, substep, this);
                 newstep.instantiate(substep);
             } else {
-                throw new XProcException(step.getNode(), "This can't happen, can it? try contains something that isn't a group or a catch?");
+                throw new XProcException(
+                    step, "This can't happen, can it? try contains something that isn't a group or a catch?");
             }
         }
 

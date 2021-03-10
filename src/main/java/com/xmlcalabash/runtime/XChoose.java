@@ -42,7 +42,7 @@ public class XChoose extends XCompoundStep {
                 XOtherwise newstep = new XOtherwise(runtime, substep, this);
                 newstep.instantiate(substep);
             } else {
-                throw new XProcException(step.getNode(), "This can't happen, can it? choose contains something that isn't a when or an otherwise?");
+                throw new XProcException(step, "This can't happen, can it? choose contains something that isn't a when or an otherwise?");
             }
         }
 

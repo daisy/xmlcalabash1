@@ -95,7 +95,7 @@ public abstract class XStep implements XProcRunnable {
         if (xinputs.containsKey(port)) {
             return xinputs.get(port);
         } else {
-            throw new XProcException(step.getNode(), "Attempt to get non-existant input '" + port + "' port from step.");
+            throw new XProcException(step, "Attempt to get non-existant input '" + port + "' port from step.");
         }
     }
 
@@ -107,7 +107,7 @@ public abstract class XStep implements XProcRunnable {
                     && step.getStep().getVersion() > 1.0) {
                 return null;
             } else {
-                throw new XProcException(step.getNode(), "Attempt to get non-existant output '" + port + "' port from step.");
+                throw new XProcException(step, "Attempt to get non-existant output '" + port + "' port from step.");
             }
         }
     }
@@ -128,14 +128,14 @@ public abstract class XStep implements XProcRunnable {
         }
 
         if (pportCount == 0) {
-            throw new XProcException(step.getNode(), "Attempt to set parameter but there's no parameter port.");
+            throw new XProcException(step, "Attempt to set parameter but there's no parameter port.");
         }
 
         if (ppport != null) {
             pport = ppport;
         } else {
             if (pportCount > 1) {
-                throw new XProcException(step.getNode(), "Attempt to set parameter w/o specifying a port (and there's more than one)");
+                throw new XProcException(step, "Attempt to set parameter w/o specifying a port (and there's more than one)");
             }
         }
 
@@ -150,14 +150,14 @@ public abstract class XStep implements XProcRunnable {
             XInput xinput = getInput(port); // Make sure there is one
             Input input = getDeclareStep().getInput(port);
             if (!input.getParameterInput()) {
-                throw new XProcException(step.getNode(), "Attempt to write parameters to non-parameter input port: " + port);
+                throw new XProcException(step, "Attempt to write parameters to non-parameter input port: " + port);
             }
             pparams = new Hashtable<QName,RuntimeValue> ();
             parameters.put(port, pparams);
         }
 
         if (pparams.containsKey(name)) {
-            throw new XProcException(step.getNode(), "Duplicate parameter: " + name);
+            throw new XProcException(step, "Duplicate parameter: " + name);
         }
 
         if (XProcConstants.NS_XPROC.equals(name.getNamespaceURI())) {

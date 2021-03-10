@@ -169,7 +169,7 @@ public class XQuery extends DefaultStep {
                         tree.endDocument();
                         node = tree.getResult();
                     } else {
-                        throw new XProcException(step.getNode(), "p:xquery returned atomic value");
+                        throw new XProcException(step, "p:xquery returned atomic value");
                     }
                 } else {
                     node = (XdmNode) item;

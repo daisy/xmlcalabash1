@@ -275,6 +275,10 @@ public class XProcException extends RuntimeException {
         this(null, location, message, null);
     }
 
+    public XProcException(XStep location, String message) {
+        this(null, location, message, null);
+    }
+
     public XProcException(XStep location, Throwable message) {
         this(null, location, message, null);
     }
