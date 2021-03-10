@@ -666,7 +666,9 @@ public class XProcException extends RuntimeException {
             if (step == null || step.getNode() == null) {
                 instructionName = null;
             } else {
-                instructionName = step.getNode().getNodeName().getClarkName();
+                String name = step.getName();
+                instructionName = step.getNode().getNodeName().getClarkName()
+                + ((name.startsWith("#") || name.startsWith("!")) ? "" : (" name=\"" + name + "\""));
             }
         }
         public Step getStep() {
@@ -756,6 +758,9 @@ public class XProcException extends RuntimeException {
                 int line = l.getLineNumber();
                 if (line > 0)
                     writer.addAttribute(_line, ""+line);
+                int column = l.getColumnNumber();
+                if (column > 0)
+                    writer.addAttribute(_column, ""+column);
                 writer.addEndElement();
             }
         }
