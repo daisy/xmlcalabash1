@@ -126,7 +126,7 @@ public class XProcRuntime implements DeclarationScope {
     private XProcURIResolver uriResolver = null;
     private XProcConfiguration config = null;
     private QName errorCode = null;
-    private XdmNode errorNode = null;
+    private XdmNode errorLocation = null;
     private String errorMessage = null;
     private Hashtable<QName, DeclareStep> declaredSteps = new Hashtable<QName,DeclareStep> ();
     private DeclareStep pipeline = null;
@@ -685,7 +685,7 @@ public class XProcRuntime implements DeclarationScope {
         decl.setup();
 
         if (errorCode != null) {
-            throw new XProcException(errorCode, errorNode, errorMessage);
+            throw new XProcException(errorCode, errorLocation, errorMessage);
         }
 
         xpipeline = new XPipeline(this, pipeline, root);
@@ -986,30 +986,29 @@ public class XProcRuntime implements DeclarationScope {
     // so that messages can be formatted in a common way and so
     // that errors can be trapped.
 
-    public void error(XProcRunnable step, XdmNode node, String message, QName code) {
+    public void error(XProcRunnable step, XdmNode location, String message, QName code) {
         if (errorCode == null) {
             errorCode = code;
-            errorNode = node;
+            errorLocation = location;
             errorMessage = message;
         }
-
-        msgListener.error(step, node, message, code);
+        msgListener.error(step, location, message, code);
     }
 
     public void error(Throwable error) {
         msgListener.error(error);
     }
 
-    public void warning(XProcRunnable step, XdmNode node, String message) {
-        msgListener.warning(step, node, message);
+    public void warning(XProcRunnable step, XdmNode location, String message) {
+        msgListener.warning(step, location, message);
     }
 
     public void warning(Throwable error) {
         msgListener.warning(error);
     }
 
-    public void info(XProcRunnable step, XdmNode node, String message) {
-        msgListener.info(step, node, message);
+    public void info(XProcRunnable step, XdmNode location, String message) {
+        msgListener.info(step, location, message);
     }
 
     // ===========================================================

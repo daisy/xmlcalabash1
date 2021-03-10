@@ -97,7 +97,7 @@ public abstract class SourceArtifact {
         runtime.error(null, node, message, code);
     }
 
-    public void error(XdmNode node, String message, QName code) {
-        runtime.error(null, node, message, code);
+    public void error(XdmNode location, String message, QName code) {
+        runtime.error(null, location, message, code);
     }
 }
