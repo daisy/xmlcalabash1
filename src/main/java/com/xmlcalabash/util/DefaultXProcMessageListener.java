@@ -12,7 +12,6 @@ import net.sf.saxon.trans.XPathException;
 import java.math.BigDecimal;
 import javax.xml.transform.SourceLocator;
 import javax.xml.transform.TransformerException;
-import java.net.URI;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,14 +26,14 @@ public class DefaultXProcMessageListener implements XProcMessageListener {
     private static Logger defaultLogger = LoggerFactory.getLogger(DefaultXProcMessageListener.class);
     private Logger log = defaultLogger;
 
-    public void error(XProcRunnable step, XdmNode location, String message, QName code) {
+    public void error(XProcRunnable step, XProcException error) {
         if (step != null) {
             log = LoggerFactory.getLogger(step.getClass());
         } else {
             log = defaultLogger;
         }
 
-        log.error(message(step, location, message, code));
+        log.error(message(step, error.getLocation()[0], error.getMessage(), error.getErrorCode()));
     }
 
     public void error(Throwable exception) {
@@ -158,17 +157,11 @@ public class DefaultXProcMessageListener implements XProcMessageListener {
     }
 
     private String message(XProcRunnable step, XdmNode location, String message) {
-        return message(step, location, message, null);
-    }
-
-    private String message(XProcRunnable step, XdmNode location, String message, QName code) {
         String prefix = "";
         if (location != null) {
-            URI cwd = URIUtils.cwdAsURI();
-            String systemId = cwd.relativize(location.getBaseURI()).toASCIIString();
+            String systemId = URIUtils.cwdAsURI().relativize(location.getBaseURI()).toASCIIString();
             int line = location.getLineNumber();
             int col = location.getColumnNumber();
-
             if (systemId != null && !"".equals(systemId)) {
                 prefix = prefix + systemId + ":";
             }
@@ -179,7 +172,25 @@ public class DefaultXProcMessageListener implements XProcMessageListener {
                 prefix = prefix + col + ":";
             }
         }
+        return prefix + message;
+    }
 
+    private String message(XProcRunnable step, SourceLocator location, String message, QName code) {
+        String prefix = "";
+        if (location != null) {
+            String systemId = location.getSystemId();
+            int line = location.getLineNumber();
+            int col = location.getColumnNumber();
+            if (systemId != null && !"".equals(systemId)) {
+                prefix = prefix + systemId + ":";
+            }
+            if (line != -1) {
+                prefix = prefix + line + ":";
+            }
+            if (col != -1) {
+                prefix = prefix + col + ":";
+            }
+        }
         return prefix + message;
     }
 

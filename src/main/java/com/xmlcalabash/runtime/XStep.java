@@ -297,8 +297,8 @@ public abstract class XStep implements XProcRunnable {
     public abstract void reset();
     public abstract void run() throws SaxonApiException;
 
-    public void error(XdmNode location, String message, QName code) {
-        runtime.error(this, location, message, code);
+    public void error(XProcException error) {
+        runtime.error(this, error);
     }
 
     public void warning(XdmNode location, String message) {

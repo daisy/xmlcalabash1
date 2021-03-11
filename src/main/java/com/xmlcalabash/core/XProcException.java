@@ -223,6 +223,10 @@ public class XProcException extends RuntimeException {
         return new DynamicXProcError(XProcConstants.stepError(code), null, message, null);
     }
 
+    public static XProcException stepError(int code, XdmNode location, String message) {
+        return new DynamicXProcError(XProcConstants.stepError(code), location, message, null);
+    }
+
     public XProcException(QName code, XdmNode location, String message) {
         this(code, location, message, null);
     }
@@ -313,6 +317,14 @@ public class XProcException extends RuntimeException {
             ? fromException(throwable.getCause())
             : null;
         return new XProcException(null, throwable, throwable, cause);
+    }
+
+    /**
+     * Create a new instance of the same XProc error, to allow to better track where exceptions are
+     * thrown.
+     */
+    public XProcException copy() {
+        return new XProcException(errorCode, location, this, errorCause);
     }
 
     public XProcException rebase(SourceLocator[] base) {

@@ -22,6 +22,7 @@ package com.xmlcalabash.model;
 import java.util.Vector;
 import net.sf.saxon.s9api.QName;
 import net.sf.saxon.s9api.XdmNode;
+import com.xmlcalabash.core.XProcException;
 import com.xmlcalabash.core.XProcRuntime;
 import com.xmlcalabash.core.XProcConstants;
 import org.slf4j.Logger;
@@ -110,12 +111,12 @@ public class Option extends EndPoint implements ComputableValue {
         boolean valid = true;
 
         if (bindings.size() > 1) {
-            error("Option can have at most one binding.", XProcConstants.dynamicError(8));
+            error(XProcException.dynamicError(8, "Option can have at most one binding."));
             valid = false;
         }
 
         if (required && (select != null)) {
-            error("You can't specify a default value on a required option", XProcConstants.staticError(17));
+            error(XProcException.staticError(17, "You can't specify a default value on a required option"));
         }
         
         return valid;

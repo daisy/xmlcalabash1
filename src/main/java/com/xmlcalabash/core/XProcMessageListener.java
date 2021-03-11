@@ -14,7 +14,7 @@ import net.sf.saxon.s9api.XdmNode;
  * To change this template use File | Settings | File Templates.
  */
 public interface XProcMessageListener {
-    public void error(XProcRunnable step, XdmNode location, String message, QName code);
+    public void error(XProcRunnable step, XProcException error);
     public void error(Throwable exception);
     public void warning(XProcRunnable step, XdmNode location, String message);
     public void warning(Throwable exception);

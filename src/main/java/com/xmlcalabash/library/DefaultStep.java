@@ -142,8 +142,8 @@ public class DefaultStep implements XProcStep {
         throw new XProcException("XProcStep implementation must override reset().");
     }
 
-    public void error(XdmNode location, String message, QName code) {
-        runtime.error(this, location, message, code);
+    public void error(XProcException error) {
+        runtime.error(this, error);
     }
 
     public void warning(XdmNode location, String message) {
