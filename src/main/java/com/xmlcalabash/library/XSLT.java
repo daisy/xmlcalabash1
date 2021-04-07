@@ -218,8 +218,27 @@ public class XSLT extends DefaultStep {
         try {
             XsltCompiler compiler = runtime.getProcessor().newXsltCompiler();
             compiler.setSchemaAware(processor.isSchemaAware());
-            compiler.setErrorListener(new LogCompileErrors());
-            XsltExecutable exec = compiler.compile(stylesheet.asSource());
+            compiler.setErrorListener(new ReportCompileErrors());
+            XsltExecutable exec;
+            try {
+                exec = compiler.compile(stylesheet.asSource());
+            } catch (SaxonApiException sae) {
+                // catch compilation errors
+                Throwable e = sae.getCause();
+                if (e instanceof TransformerException) {
+                    // Actually this exception does not contain location info (but we pass it
+                    // anyway) and the message is always "Errors were reported during stylesheet
+                    // compilation". More info including location of the compilation errors are
+                    // contained in the TransformerException that are passed to ReportCompileErrors.
+                    TransformerException location = (TransformerException)e;
+                    Throwable cause = e.getCause();
+                    if (cause != null)
+                        throw new XProcException(location, e, XProcException.fromException(cause));
+                    else
+                        throw new XProcException(location, e);
+                }
+                throw XProcException.fromException(sae);
+            }
             XsltTransformer transformer = exec.load();
 
             for (QName name : params.keySet()) {
@@ -599,14 +618,17 @@ public class XSLT extends DefaultStep {
             return myWrapped.getPipelineConfiguration();
         }
     }
-    
-    class LogCompileErrors implements ErrorListener {
+
+    private class ReportCompileErrors implements ErrorListener {
+        // log error
         public void error(TransformerException exception) {
             logger.error(exception.getMessage());
         }
+        // report fatal error
         public void fatalError(TransformerException exception) {
-            logger.error(exception.getMessage());
+            step.reportError(new XProcException(exception, exception));
         }
+        // log warning
         public void warning(TransformerException exception) {
             logger.warn(exception.getMessage());
         }
