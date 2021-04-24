@@ -569,7 +569,7 @@ public class XAtomicStep extends XStep {
             }
         }
 
-        RuntimeValue value = new RuntimeValue(stringValue, items, pnode, new Hashtable<String,String> ());
+        RuntimeValue value = new RuntimeValue(stringValue, new XdmValue(items), pnode, new Hashtable<String,String> ());
 
         if (port != null) {
             impl.setParameter(port,pname,value);
@@ -712,22 +712,22 @@ public class XAtomicStep extends XStep {
         }
 
         String select = var.getSelect();
-        Vector<XdmItem> results = evaluateXPath(doc, nsBindings, select, globals);
-        String value = "";
+        XdmValue value = new XdmValue(evaluateXPath(doc, nsBindings, select, globals));
+        String stringValue = "";
 
         try {
-            for (XdmItem item : results) {
+            for (XdmItem item : value) {
                 if (item.isAtomicValue()) {
-                    value += item.getStringValue();
+                    stringValue += item.getStringValue();
                 } else {
                     XdmNode node = (XdmNode) item;
                     if (node.getNodeKind() == XdmNodeKind.ATTRIBUTE
                             || node.getNodeKind() == XdmNodeKind.NAMESPACE) {
-                        value += node.getStringValue();
+                        stringValue += node.getStringValue();
                     } else {
                         XdmDestination dest = new XdmDestination();
                         S9apiUtils.writeXdmValue(runtime,item,dest,null);
-                        value += dest.getXdmNode().getStringValue();
+                        stringValue += dest.getXdmNode().getStringValue();
                     }
                 }
             }
@@ -749,11 +749,11 @@ public class XAtomicStep extends XStep {
 
         // Test to see if the option has a reasonable string value
         if (var.getTypeAsQName() != null) {
-            TypeUtils.checkType(runtime, value, var.getTypeAsQName(), var.getNode());
+            TypeUtils.checkType(runtime, stringValue, var.getTypeAsQName(), var.getNode());
         } else if (var.getType() != null) {
             String type = var.getType();
             if (type.contains("|")) {
-                TypeUtils.checkLiteral(value, type);
+                TypeUtils.checkLiteral(stringValue, type);
             }
         }
 
@@ -789,21 +789,23 @@ public class XAtomicStep extends XStep {
         //
         // If the select attribute was used to specify the value and it evaluated to a node-set, then the in-scope
         // namespaces from the first node in the selected node-set (or, if it's not an element, its parent) are used.
-        if (results.size() > 0 && results.get(0) instanceof XdmNode) {
-            XdmNode node = (XdmNode) results.get(0);
-            nsBindings.clear();
-
-            XdmSequenceIterator nsIter = node.axisIterator(Axis.NAMESPACE);
-            while (nsIter.hasNext()) {
-                XdmNode ns = (XdmNode) nsIter.next();
-                nsBindings.put((ns.getNodeName()==null ? "" : ns.getNodeName().getLocalName()),ns.getStringValue());
+        if (value.size() > 0) {
+            XdmItem first = value.iterator().next();
+            if (first instanceof XdmNode) {
+                XdmNode node = (XdmNode)first;
+                nsBindings.clear();
+                XdmSequenceIterator nsIter = node.axisIterator(Axis.NAMESPACE);
+                while (nsIter.hasNext()) {
+                    XdmNode ns = (XdmNode) nsIter.next();
+                    nsBindings.put((ns.getNodeName()==null ? "" : ns.getNodeName().getLocalName()),ns.getStringValue());
+                }
             }
         }
 
         if (runtime.getAllowGeneralExpressions()) {
-            return new RuntimeValue(value,results,var.getNode(),nsBindings);
+            return new RuntimeValue(stringValue, value, var.getNode(), nsBindings);
         } else {
-            return new RuntimeValue(value,var.getNode(),nsBindings);
+            return new RuntimeValue(stringValue, var.getNode(), nsBindings);
         }
     }
 
