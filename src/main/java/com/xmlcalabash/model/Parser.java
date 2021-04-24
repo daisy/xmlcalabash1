@@ -873,6 +873,7 @@ public class Parser {
         String required = node.getAttributeValue(new QName("required"));
         String select = node.getAttributeValue(new QName("select"));
         String type = node.getAttributeValue(XProcConstants.cx_type);
+        String sequenceType = node.getAttributeValue(XProcConstants.cx_as);
 
         if (name == null) {
             throw XProcException.staticError(38, node, "Attribute \"name\" required on p:with-option");
@@ -907,6 +908,21 @@ public class Parser {
                 }
             else
                 option.setType(type);
+        }
+        if (runtime.getAllowGeneralExpressions()) {
+            try {
+                if (sequenceType != null) {
+                    option.setSequenceType(SequenceType.parse(sequenceType, node));
+                } else if (type != null) {
+                    if (type.contains(":"))
+                        option.setSequenceType(SequenceType.parse(type, node));
+                    else
+                        option.setSequenceType(SequenceType.XS_STRING);
+                }
+            } catch (IllegalArgumentException e) {
+                throw new XProcException(
+                    new RuntimeException("Cannot parse type (\"as\" attribute) on " + node, e));
+            }
         }
 
         readNamespaceBindings(parent, option, node, select);
@@ -951,6 +967,7 @@ public class Parser {
 
         String name = node.getAttributeValue(new QName("name"));
         String select = node.getAttributeValue(new QName("select"));
+        String sequenceType = node.getAttributeValue(XProcConstants.cx_as);
 
         QName oname = new QName(name, node);
 
@@ -966,6 +983,14 @@ public class Parser {
         Variable variable = new Variable(runtime, node);
         variable.setName(oname);
         variable.setSelect(select);
+        if (runtime.getAllowGeneralExpressions() && sequenceType != null) {
+            try {
+                variable.setSequenceType(SequenceType.parse(sequenceType, node));
+            } catch (IllegalArgumentException e) {
+                throw new XProcException(
+                    new RuntimeException("Cannot parse type (\"as\" attribute) on " + node, e));
+            }
+        }
 
         readNamespaceBindings(parent, variable, node, select);
 

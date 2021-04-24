@@ -37,6 +37,7 @@ public class Option extends EndPoint implements ComputableValue {
     private String select = null;
     private String type = null;
     private QName typeAsQName = null;
+    private SequenceType sequenceType = null;
     private Vector<NamespaceBinding> nsBindings = new Vector<NamespaceBinding>();
 
     /* Creates a new instance of Option */
@@ -67,6 +68,14 @@ public class Option extends EndPoint implements ComputableValue {
 
     public QName getTypeAsQName() {
         return typeAsQName;
+    }
+
+    public void setSequenceType(SequenceType sequenceType) {
+        this.sequenceType = sequenceType;
+    }
+
+    public SequenceType getSequenceType() {
+        return sequenceType;
     }
 
     public void setRequired(String required) {

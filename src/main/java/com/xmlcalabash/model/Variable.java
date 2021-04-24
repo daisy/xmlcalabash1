@@ -36,6 +36,7 @@ import org.slf4j.LoggerFactory;
 public class Variable extends EndPoint implements ComputableValue {
     private QName name = null;
     private String select = null;
+    private SequenceType sequenceType = null;
     private Vector<NamespaceBinding> nsBindings = new Vector<NamespaceBinding> ();
 
     /* Creates a new instance of Variable */
@@ -57,6 +58,14 @@ public class Variable extends EndPoint implements ComputableValue {
 
     public QName getTypeAsQName() {
         return null;
+    }
+
+    public void setSequenceType(SequenceType sequenceType) {
+        this.sequenceType = sequenceType;
+    }
+
+    public SequenceType getSequenceType() {
+        return sequenceType;
     }
 
     public void setSelect(String select) {

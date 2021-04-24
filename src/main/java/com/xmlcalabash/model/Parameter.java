@@ -70,6 +70,10 @@ public class Parameter extends EndPoint implements ComputableValue {
         return null;
     }
 
+    public SequenceType getSequenceType() {
+        return null;
+    }
+
     public void setPosition(int pos) {
         position = pos;
     }

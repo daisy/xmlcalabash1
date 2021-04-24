@@ -1177,7 +1177,9 @@ public class Step extends SourceArtifact {
                     addOption(doption);
                 }
             } else {
-                option.setType(doption.getType(), doption.getTypeAsQName()); // copy the type over
+                // copy the type over
+                option.setType(doption.getType(), doption.getTypeAsQName());
+                option.setSequenceType(doption.getSequenceType());
             }
         }
     }

@@ -28,6 +28,7 @@ import com.xmlcalabash.model.ComputableValue;
 import com.xmlcalabash.model.NamespaceBinding;
 import com.xmlcalabash.model.DeclareStep;
 import com.xmlcalabash.model.Option;
+import com.xmlcalabash.model.SequenceType;
 import com.xmlcalabash.util.XProcMessageListenerHelper;
 import net.sf.saxon.om.InscopeNamespaceResolver;
 import net.sf.saxon.om.NameChecker;
@@ -747,16 +748,6 @@ public class XAtomicStep extends XStep {
             throw new XProcException(sae);
         }
 
-        // Test to see if the option has a reasonable string value
-        if (var.getTypeAsQName() != null) {
-            TypeUtils.checkType(runtime, stringValue, var.getTypeAsQName(), var.getNode());
-        } else if (var.getType() != null) {
-            String type = var.getType();
-            if (type.contains("|")) {
-                TypeUtils.checkLiteral(stringValue, type);
-            }
-        }
-
         // Section 5.7.5 Namespaces on variables, options, and parameters
         //
         // If the select attribute was used to specify the value and it consisted of a single VariableReference
@@ -802,7 +793,30 @@ public class XAtomicStep extends XStep {
             }
         }
 
+        // Cast the value if needed
         if (runtime.getAllowGeneralExpressions()) {
+            if (var.getSequenceType() != null) {
+                if (SequenceType.XS_STRING.equals(var.getSequenceType())) {
+                    value = null;
+                } else {
+                    value = var.getSequenceType().cast(value, var.getNode());
+                }
+            }
+        } else {
+            value = null;
+        }
+
+        // Test to see if the option has a reasonable string value
+        if (var.getTypeAsQName() != null) {
+            TypeUtils.checkType(runtime, stringValue, var.getTypeAsQName(), var.getNode());
+        } else if (var.getType() != null) {
+            String type = var.getType();
+            if (type.contains("|")) {
+                TypeUtils.checkLiteral(stringValue, type);
+            }
+        }
+
+        if (value != null) {
             return new RuntimeValue(stringValue, value, var.getNode(), nsBindings);
         } else {
             return new RuntimeValue(stringValue, var.getNode(), nsBindings);
