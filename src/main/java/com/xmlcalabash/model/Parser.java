@@ -897,7 +897,17 @@ public class Parser {
         option.setName(oname);
         option.setRequired(required);
         option.setSelect(select);
-        option.setType(type, node);
+        if (type != null) {
+            if (type.contains(":"))
+                try {
+                    option.setType(type, new QName(type, node));
+                } catch (IllegalArgumentException e) {
+                    throw new XProcException(
+                        new RuntimeException("Cannot parse type (\"type\" attribute) on " + node, e));
+                }
+            else
+                option.setType(type);
+        }
 
         readNamespaceBindings(parent, option, node, select);
 

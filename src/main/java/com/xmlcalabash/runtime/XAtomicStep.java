@@ -352,15 +352,14 @@ public class XAtomicStep extends XStep {
             Option option = step.getOption(name);
             RuntimeValue value = computeValue(option);
 
+            // Test to see if the option has a reasonable string value according to the declaration
             Option optionDecl = decl.getOption(name);
-            String typeName = optionDecl.getType();
-            XdmNode declNode = optionDecl.getNode();
-            if (typeName != null && declNode != null) {
-                if (typeName.contains("|")) {
-                    TypeUtils.checkLiteral(value.getString(), typeName);
-                } else {
-                    QName type = new QName(typeName, declNode);
-                    TypeUtils.checkType(runtime, value.getString(),type,option.getNode());
+            if (optionDecl.getTypeAsQName() != null) {
+                TypeUtils.checkType(runtime, value.getString(), optionDecl.getTypeAsQName(), option.getNode());
+            } else if (optionDecl.getType() != null) {
+                String type = optionDecl.getType();
+                if (type.contains("|")) {
+                    TypeUtils.checkLiteral(value.getString(), type);
                 }
             }
 
@@ -748,13 +747,13 @@ public class XAtomicStep extends XStep {
             throw new XProcException(sae);
         }
 
-        // Now test to see if the option is a reasonable value
-        if (var.getType() != null) {
+        // Test to see if the option has a reasonable string value
+        if (var.getTypeAsQName() != null) {
+            TypeUtils.checkType(runtime, value, var.getTypeAsQName(), var.getNode());
+        } else if (var.getType() != null) {
             String type = var.getType();
             if (type.contains("|")) {
                 TypeUtils.checkLiteral(value, type);
-            } else if (type.contains(":")) {
-                TypeUtils.checkType(runtime, value, var.getTypeAsQName(), var.getNode());
             }
         }
 

@@ -36,7 +36,7 @@ public class Option extends EndPoint implements ComputableValue {
     private boolean required = false;
     private String select = null;
     private String type = null;
-    private XdmNode typeNode = null;
+    private QName typeAsQName = null;
     private Vector<NamespaceBinding> nsBindings = new Vector<NamespaceBinding>();
 
     /* Creates a new instance of Option */
@@ -52,9 +52,13 @@ public class Option extends EndPoint implements ComputableValue {
         return name;
     }
 
-    public void setType(String type, XdmNode node) {
+    public void setType(String type) {
+        this.setType(type, null);
+    }
+
+    public void setType(String type, QName typeAsQName) {
         this.type = type;
-        typeNode = node;
+        this.typeAsQName = typeAsQName;
     }
 
     public String getType() {
@@ -62,7 +66,7 @@ public class Option extends EndPoint implements ComputableValue {
     }
 
     public QName getTypeAsQName() {
-        return new QName(type,typeNode);
+        return typeAsQName;
     }
 
     public void setRequired(String required) {

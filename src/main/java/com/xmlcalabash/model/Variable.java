@@ -36,7 +36,6 @@ import org.slf4j.LoggerFactory;
 public class Variable extends EndPoint implements ComputableValue {
     private QName name = null;
     private String select = null;
-    private String type = null;
     private Vector<NamespaceBinding> nsBindings = new Vector<NamespaceBinding> ();
 
     /* Creates a new instance of Variable */
