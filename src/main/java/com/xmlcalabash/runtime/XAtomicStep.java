@@ -720,7 +720,7 @@ public class XAtomicStep extends XStep {
             for (XdmItem item : value) {
                 if (item.isAtomicValue()) {
                     stringValue += item.getStringValue();
-                } else {
+                } else if (item instanceof XdmNode) {
                     XdmNode node = (XdmNode) item;
                     if (node.getNodeKind() == XdmNodeKind.ATTRIBUTE
                             || node.getNodeKind() == XdmNodeKind.NAMESPACE) {
@@ -730,6 +730,11 @@ public class XAtomicStep extends XStep {
                         S9apiUtils.writeXdmValue(runtime,item,dest,null);
                         stringValue += dest.getXdmNode().getStringValue();
                     }
+                } else {
+                    // Don't know how to create string value from item. Take empty string, and raise
+                    // an error if we're not in "general-values" mode.
+                    if (!runtime.getAllowGeneralExpressions())
+                        throw new XProcException("Can not evaluate expression when not in 'general-values' mode: " + select);
                 }
             }
         } catch (SaxonApiUncheckedException saue) {
