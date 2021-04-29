@@ -90,6 +90,7 @@ public class XSLT extends DefaultStep {
     private static final QName _version = new QName("", "version");
     private static final QName _content_type = new QName("content-type");
     private static final QName cx_decode = new QName("cx", XProcConstants.NS_CALABASH_EX, "decode");
+    private static final QName cx_serialize = new QName("cx", XProcConstants.NS_CALABASH_EX, "serialize");
     private ReadablePipe sourcePipe = null;
     private ReadablePipe stylesheetPipe = null;
     private WritablePipe resultPipe = null;
@@ -181,7 +182,7 @@ public class XSLT extends DefaultStep {
 
         QName initialMode = null;
         QName templateName = null;
-        String outputBaseURI = null;
+        URI outputBaseURI = null;
 
         RuntimeValue opt = getOption(_initial_mode);
         if (opt != null) {
@@ -195,7 +196,7 @@ public class XSLT extends DefaultStep {
 
         opt = getOption(_output_base_uri);
         if (opt != null) {
-            outputBaseURI = opt.getString();
+            outputBaseURI = opt.getBaseURI().resolve(opt.getString());
         }
 
         Processor processor = runtime.getProcessor();
@@ -212,6 +213,8 @@ public class XSLT extends DefaultStep {
         config.setCollectionFinder(new XProcCollectionFinder(runtime, defaultCollection, collectionFinder));
 
         XdmDestination result = null;
+        ByteArrayOutputStream outputStream = null;
+
         try {
             XsltCompiler compiler = runtime.getProcessor().newXsltCompiler();
             compiler.setSchemaAware(processor.isSchemaAware());
@@ -233,8 +236,15 @@ public class XSLT extends DefaultStep {
             }
             CatchMessages catchMessages = new CatchMessages();
             transformer.setMessageListener(catchMessages);
-            result = new XdmDestination();
-            transformer.setDestination(result);
+            if (Boolean.parseBoolean(step.getExtensionAttribute(cx_serialize))) {
+                Serializer serializer = makeSerializer();
+                outputStream = new ByteArrayOutputStream();
+                serializer.setOutputStream(outputStream);
+                transformer.setDestination(serializer);
+            } else {
+                result = new XdmDestination();
+                transformer.setDestination(result);
+            }
 
             if (initialMode != null) {
                 transformer.setInitialMode(initialMode);
@@ -245,12 +255,10 @@ public class XSLT extends DefaultStep {
             }
 
             if (outputBaseURI != null) {
-                transformer.setBaseOutputURI(outputBaseURI);
-                // The following hack works around https://saxonica.plan.io/issues/1724
-                try {
-                    result.setBaseURI(new URI(outputBaseURI));
-                } catch (URISyntaxException use) {
-                    // whatever
+                transformer.setBaseOutputURI(outputBaseURI.toASCIIString());
+                if (result != null) {
+                    // The following hack works around https://saxonica.plan.io/issues/1724
+                    result.setBaseURI(outputBaseURI);
                 }
             }
 
@@ -290,9 +298,10 @@ public class XSLT extends DefaultStep {
             config.setCollectionFinder(collectionFinder);
         }
 
-        XdmNode xformed = result.getXdmNode();
+        XdmNode xformed = result != null ? result.getXdmNode() : null;
 
-        // Can be null when nothing is written to the principle result tree...
+        // Is null when cx:serialize attribute was specified or when nothing is written to the
+        // principle result tree
         if (xformed != null) {
             if (getOption(_output_base_uri) == null && document != null) {
                 // Before Saxon 9.8, it was possible to simply set the base uri of the
@@ -342,6 +351,19 @@ public class XSLT extends DefaultStep {
                     throw new XProcException(step.getStep(), "p:xslt returned non-XML result", e.getCause());
                 }
             }
+        }
+
+        if (outputStream != null) {
+            TreeWriter tree = new TreeWriter(runtime);
+            tree.startDocument(outputBaseURI != null ? outputBaseURI : document != null ? document.getBaseURI() : null);
+            tree.addStartElement(XProcConstants.c_result);
+            tree.addAttribute(_content_type, "text/plain");
+            tree.addAttribute(cx_decode,"true");
+            tree.startContent();
+            tree.addText(outputStream.toString());
+            tree.addEndElement();
+            tree.endDocument();
+            resultPipe.write(tree.getResult());
         }
     }
     
