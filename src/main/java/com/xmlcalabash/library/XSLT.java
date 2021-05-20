@@ -276,13 +276,10 @@ public class XSLT extends DefaultStep {
                     final SourceLocator[] frames = XProcException.getLocator((TransformerException)e);
                     Throwable cause = e.getCause();
                     if (cause != null) {
-                        if (cause instanceof XProcException)
-                            throw ((XProcException)cause).rebaseOnto(frames);
-                        else
-                            throw new XProcException(message, XProcException.javaError(cause, 0)) {
-                                @Override
-                                public SourceLocator[] getLocator() {
-                                    return frames; }};
+                        throw new XProcException(message, XProcException.javaError(cause, 0)) {
+                            @Override
+                            public SourceLocator[] getLocator() {
+                                return frames; }};
                     } else
                         // passing e in order to provide some more details
                         // (but not wrapping it in an XProcException so that it doesn't appear in locator)
