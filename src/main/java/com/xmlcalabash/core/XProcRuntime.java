@@ -136,6 +136,7 @@ public class XProcRuntime implements DeclarationScope {
     private boolean allowGeneralExpressions = true;
     private boolean allowXPointerOnText = true;
     private boolean allowTextResults = true;
+    private boolean allowSequenceAsContext = true;
     private boolean transparentJSON = false;
     private String jsonFlavor = JSONtoXML.MARKLOGIC;
     private boolean useXslt10 = false;
@@ -241,6 +242,7 @@ public class XProcRuntime implements DeclarationScope {
         allowGeneralExpressions = config.extensionValues;
         allowXPointerOnText = config.xpointerOnText;
         allowTextResults = config.allowTextResults;
+        allowSequenceAsContext = config.sequenceAsContext;
         transparentJSON = config.transparentJSON;
         jsonFlavor = config.jsonFlavor;
         useXslt10 = config.useXslt10;
@@ -304,6 +306,7 @@ public class XProcRuntime implements DeclarationScope {
         configurer = runtime.configurer;
         allowGeneralExpressions = runtime.allowGeneralExpressions;
         allowXPointerOnText = runtime.allowXPointerOnText;
+        allowSequenceAsContext = runtime.allowSequenceAsContext;
         transparentJSON = runtime.transparentJSON;
         jsonFlavor = runtime.jsonFlavor;
         profile = runtime.profile;
@@ -489,6 +492,10 @@ public class XProcRuntime implements DeclarationScope {
 
     public boolean getAllowTextResults() {
         return allowTextResults;
+    }
+
+    public boolean getAllowSequenceAsContext() {
+        return allowSequenceAsContext;
     }
 
     public boolean transparentJSON() {

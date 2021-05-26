@@ -30,7 +30,10 @@ import com.xmlcalabash.model.DeclareStep;
 import com.xmlcalabash.model.Option;
 import com.xmlcalabash.model.SequenceType;
 import com.xmlcalabash.util.TreeWriter;
+import com.xmlcalabash.util.XProcCollectionFinder;
 import com.xmlcalabash.util.XProcMessageListenerHelper;
+import net.sf.saxon.Configuration;
+import net.sf.saxon.lib.CollectionFinder;
 import net.sf.saxon.om.InscopeNamespaceResolver;
 import net.sf.saxon.om.NameChecker;
 import net.sf.saxon.om.NamePool;
@@ -601,6 +604,10 @@ public class XAtomicStep extends XStep {
         Hashtable<String,String> nsBindings = new Hashtable<String,String> ();
         Hashtable<QName,RuntimeValue> globals = inScopeOptions;
         XdmNode doc = null;
+        Vector<XdmNode> defaultCollection = null;
+        if (runtime.getAllowSequenceAsContext()) {
+            defaultCollection = new Vector<XdmNode>();
+        }
 
         try {
             if (var.getBinding().size() > 0) {
@@ -611,11 +618,29 @@ public class XAtomicStep extends XStep {
                     pipe = ((XCatch) this).errorPipe;
                 } else {
                     pipe = getPipeFromBinding(binding);
+                    pipe.canReadSequence(runtime.getAllowSequenceAsContext());
                 }
-                doc = pipe.read();
-                if (pipe.moreDocuments()) {
-                    throw XProcException.dynamicError(
-                        8, this, "More than one document in context for parameter '" + var.getName() + "'");
+                if (pipe.readSequence()) {
+                    while (pipe.moreDocuments()) {
+                        if (defaultCollection != null) {
+                            if (doc == null) {
+                                doc = pipe.read();
+                                defaultCollection.add(doc);
+                            } else {
+                                defaultCollection.add(pipe.read());
+                            }
+                        } else if (doc == null) {
+                            doc = pipe.read();
+                        } else {
+                            pipe.read();
+                        }
+                    }
+                } else {
+                    doc = pipe.read();
+                    if (pipe.moreDocuments()) {
+                        throw XProcException.dynamicError(
+                            8, this, "More than one document in context for parameter '" + var.getName() + "'");
+                    }
                 }
             }
         } catch (SaxonApiException sae) {
@@ -732,7 +757,7 @@ public class XAtomicStep extends XStep {
         }
 
         String select = var.getSelect();
-        XdmValue value = new XdmValue(evaluateXPath(doc, nsBindings, select, globals));
+        XdmValue value = new XdmValue(evaluateXPath(doc, defaultCollection, nsBindings, select, globals));
         String stringValue = "";
 
         try {
@@ -847,7 +872,7 @@ public class XAtomicStep extends XStep {
         }
     }
 
-    protected Vector<XdmItem> evaluateXPath(XdmNode doc, Hashtable<String,String> nsBindings, String xpath, Hashtable<QName,RuntimeValue> globals) {
+    protected Vector<XdmItem> evaluateXPath(XdmNode doc, Vector<XdmNode> defaultCollection, Hashtable<String,String> nsBindings, String xpath, Hashtable<QName,RuntimeValue> globals) {
         Vector<XdmItem> results = new Vector<XdmItem> ();
         Hashtable<QName,RuntimeValue> boundOpts = new Hashtable<QName,RuntimeValue> ();
 
@@ -856,6 +881,14 @@ public class XAtomicStep extends XStep {
             if (v.initialized()) {
                 boundOpts.put(name, v);
             }
+        }
+
+        CollectionFinder collectionFinder = null;
+        if (defaultCollection != null) {
+            Configuration config = runtime.getProcessor().getUnderlyingConfiguration();
+            collectionFinder = config.getCollectionFinder();
+            config.setDefaultCollection(XProcCollectionFinder.DEFAULT);
+            config.setCollectionFinder(new XProcCollectionFinder(runtime, defaultCollection, collectionFinder));
         }
 
         try {
@@ -943,6 +976,10 @@ public class XAtomicStep extends XStep {
             }
         } catch (SaxonApiUncheckedException saue) {
             throw new XProcException(this, saue);
+        } finally {
+            if (defaultCollection != null) {
+                runtime.getProcessor().getUnderlyingConfiguration().setCollectionFinder(collectionFinder);
+            }
         }
 
         return results;

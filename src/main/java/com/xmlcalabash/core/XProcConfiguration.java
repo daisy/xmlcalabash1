@@ -120,6 +120,7 @@ public class XProcConfiguration {
     public boolean extensionValues = false;
     public boolean xpointerOnText = false;
     public boolean transparentJSON = false;
+    public boolean sequenceAsContext = false;
     public String jsonFlavor = JSONtoXML.MARKLOGIC;
     public boolean useXslt10 = false;
     public boolean htmlSerializer = false;
@@ -462,6 +463,7 @@ public class XProcConfiguration {
         extensionValues = "true".equals(System.getProperty("com.xmlcalabash.general-values", ""+extensionValues));
         xpointerOnText = "true".equals(System.getProperty("com.xmlcalabash.xpointer-on-text", ""+xpointerOnText));
         transparentJSON = "true".equals(System.getProperty("com.xmlcalabash.transparent-json", ""+transparentJSON));
+        sequenceAsContext = "true".equals(System.getProperty("com.xmlcalabash.sequence-as-context", ""+sequenceAsContext));
         allowTextResults = "true".equals(System.getProperty("com.xmlcalabash.allow-text-results", ""+allowTextResults));
         safeMode = "true".equals(System.getProperty("com.xmlcalabash.safe-mode", ""+safeMode));
         jsonFlavor = System.getProperty("com.xmlcalabash.json-flavor", jsonFlavor);
@@ -802,6 +804,8 @@ public class XProcConfiguration {
             xpointerOnText = "true".equals(value);
         } else if ("transparent-json".equals(name)) {
             transparentJSON = "true".equals(value);
+        } else if ("sequence-as-context".equals(name)) {
+            sequenceAsContext = "true".equals(value);
         } else if ("json-flavor".equals(name)) {
             jsonFlavor = value;
             if (! JSONtoXML.knownFlavor(jsonFlavor)) {
