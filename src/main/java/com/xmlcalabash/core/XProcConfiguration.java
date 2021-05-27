@@ -13,7 +13,10 @@ import com.xmlcalabash.util.LogOptions;
 import com.xmlcalabash.util.Output;
 import com.xmlcalabash.util.S9apiUtils;
 import com.xmlcalabash.util.URIUtils;
+import net.sf.saxon.Configuration;
 import net.sf.saxon.Version;
+import net.sf.saxon.functions.FunctionLibrary;
+import net.sf.saxon.functions.FunctionLibraryList;
 import net.sf.saxon.om.NoElementsSpaceStrippingRule;
 import net.sf.saxon.s9api.Axis;
 import net.sf.saxon.s9api.DocumentBuilder;
@@ -53,6 +56,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Hashtable;
+import java.util.List;
 import java.util.Vector;
 import java.util.jar.JarFile;
 import java.util.zip.ZipEntry;
@@ -106,6 +110,11 @@ public class XProcConfiguration {
     public Hashtable<String,String> serializationOptions = new Hashtable<String,String>();
     public LogOptions logOpt = LogOptions.WRAPPED;
     public HashMap<String,SaxonExtensionFunction> extensionFunctions = new HashMap<String,SaxonExtensionFunction>();
+    /**
+     * List to hold the in scope XSLT function libraries (loaded with cx:import). Libraries that are
+     * added to this list become in scope, libraries that are removed become out scope.
+     */
+    public List<FunctionLibrary> inscopeXsltFunctions;
     public String foProcessor = null;
     public String cssProcessor = null;
     public String xprocConfigurer = null;
@@ -216,6 +225,17 @@ public class XProcConfiguration {
     }
 
     private void init() {
+
+        // Add inscopeXsltFunctions list to getBuiltInExtensionLibraryList. This is the most
+        // convenient way to do it. A more appropriate place would be
+        // getIntegratedFunctionLibrary(), but that would require using reflection and extending the
+        // IntegratedFunctionLibrary class.
+        FunctionLibraryList list = new FunctionLibraryList();
+        cfgProcessor.getUnderlyingConfiguration()
+                    .getBuiltInExtensionLibraryList()
+                    .addFunctionLibrary(list);
+        inscopeXsltFunctions = list.getLibraryList();
+
         // If we got a schema aware processor, make sure it's reflected in our config
         // FIXME: are there other things that should be reflected this way?
         this.schemaAware = cfgProcessor.isSchemaAware();

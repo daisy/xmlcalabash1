@@ -1416,6 +1416,13 @@ public class Parser {
             }
         }
 
+        // make XSLT functions available in child p:declare-step
+        if (declScope instanceof DeclareStep) {
+            for (XdmNode n : ((DeclareStep)declScope).getXsltFunctionImports()) {
+                step.addXsltFunctionImport(n);
+            }
+        }
+
         Vector<XdmNode> steps = new Vector<XdmNode>();
 
         if (rest != null) {
@@ -1424,7 +1431,7 @@ public class Parser {
                     Variable var = readVariable(step, substepNode);
                     step.addVariable(var);
                 } else if (cx_import.equals(substepNode.getNodeName())) {
-                    importFunctions(substepNode);
+                    importFunctions(step, substepNode);
                 } else {
                     if ((XProcConstants.p_declare_step.equals(substepNode.getNodeName()))
                             || XProcConstants.p_pipeline.equals(substepNode.getNodeName())) {
@@ -1892,13 +1899,30 @@ public class Parser {
         return name;
     }
 
-    private void importFunctions(XdmNode node) {
+    private void importFunctions(DeclareStep step, XdmNode node) {
         String href = node.getAttributeValue(_href);
         String ns = node.getAttributeValue(_namespace);
         String type = node.getAttributeValue(_type);
         Processor processor = runtime.getProcessor();
 
         String sed = processor.getUnderlyingConfiguration().getEditionCode();
+
+        if (type.contains("xsl")
+            // This alternative implementation for XSLT functions does not depend on Saxon EE. We
+            // use it only when we're running Saxon HE, even though it works for all editions of
+            // Saxon.
+            && "HE".equals(sed)) {
+            try {
+                // Note that this implementation behaves like p:import-functions from XProc 3, in
+                // the sense that the loaded functions are not globally available but only within
+                // the scope of the step declaration.
+                step.addXsltFunctionImport(runtime.parse(href, node.getBaseURI().toASCIIString()));
+                return;
+            } catch (Exception e) {
+                throw new XProcException(e);
+            }
+        }
+
         if (!"EE".equals(sed)) {
             throw new XProcException("Importing functions is only supported by Saxon EE.");
         }

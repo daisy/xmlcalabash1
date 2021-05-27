@@ -4,11 +4,15 @@ import com.xmlcalabash.core.XProcRuntime;
 import com.xmlcalabash.core.XProcException;
 import com.xmlcalabash.model.*;
 import com.xmlcalabash.util.XProcMessageListenerHelper;
+
+import net.sf.saxon.functions.FunctionLibrary;
 import net.sf.saxon.s9api.SaxonApiException;
 import net.sf.saxon.s9api.QName;
 import net.sf.saxon.s9api.XdmNode;
 
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 
 /**
  * Created by IntelliJ IDEA.
@@ -93,9 +97,18 @@ public class XPipelineCall extends XAtomicStep {
 
         runtime.start(this);
         XProcMessageListenerHelper.openStep(runtime, this);
+
+        // temporarily clear the list of in scope XSLT functions as we're gonna invoke another step
+        // (with a new scope).
+        List<FunctionLibrary> inscopeXsltFunctions
+            = new ArrayList<FunctionLibrary>(runtime.getConfiguration().inscopeXsltFunctions);
+        runtime.getConfiguration().inscopeXsltFunctions.clear();
+
         try {
             newstep.run();
         } finally {
+            // restore the in scope XSLT functions
+            runtime.getConfiguration().inscopeXsltFunctions.addAll(inscopeXsltFunctions);
             for (XdmNode doc : newstep.errors()) {
                 reportError(doc);
             }

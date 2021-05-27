@@ -45,6 +45,7 @@ public class DeclareStep extends CompoundStep implements DeclarationScope {
     private boolean atomic = true;
     protected Hashtable<QName, DeclareStep> declaredSteps = new Hashtable<QName, DeclareStep> ();
     private List<PipelineLibrary> importedLibs = new ArrayList<>();
+    private List<XdmNode> xsltFunctionImports = new ArrayList<>();
     private DeclarationScope parentScope = null;
     private Vector<XdmNode> rest = null;
     private HashSet<String> excludedInlineNamespaces = null;
@@ -117,6 +118,10 @@ public class DeclareStep extends CompoundStep implements DeclarationScope {
         importedLibs.add(lib);
     }
 
+    public void addXsltFunctionImport(XdmNode lib) {
+        xsltFunctionImports.add(lib);
+    }
+
     public void setSourceImport(URI href) {
         sourceImport = href;
     }
@@ -171,6 +176,10 @@ public class DeclareStep extends CompoundStep implements DeclarationScope {
         for (PipelineLibrary lib : importedLibs)
             decls.addAll(lib.getInScopeTypes());
         return decls;
+    }
+
+    public List<XdmNode> getXsltFunctionImports() {
+        return xsltFunctionImports;
     }
 
     private void setupEnvironment() {

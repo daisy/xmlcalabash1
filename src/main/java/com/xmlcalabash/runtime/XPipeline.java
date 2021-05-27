@@ -15,9 +15,12 @@ import com.xmlcalabash.model.Step;
 import com.xmlcalabash.model.Variable;
 import com.xmlcalabash.util.MessageFormatter;
 import com.xmlcalabash.util.TreeWriter;
+import net.sf.saxon.functions.FunctionLibrary;
 import net.sf.saxon.s9api.QName;
 import net.sf.saxon.s9api.SaxonApiException;
 import net.sf.saxon.s9api.XdmNode;
+import net.sf.saxon.s9api.XsltCompiler;
+import net.sf.saxon.style.StylesheetFunctionLibrary;
 
 import java.util.*;
 
@@ -235,6 +238,27 @@ public class XPipeline extends XCompoundStep {
             inScopeOptions.put(name, value);
         }
 
+        // load imported XSLT function libraries
+        List<FunctionLibrary> importedXsltFunctionLibraries = null; {
+            DeclareStep decl = getDeclareStep();
+            for (XdmNode n : decl.getXsltFunctionImports()) {
+                if (importedXsltFunctionLibraries == null)
+                    importedXsltFunctionLibraries = new ArrayList<>();
+                XsltCompiler compiler = runtime.getProcessor().newXsltCompiler();
+                compiler.setSchemaAware(runtime.getProcessor().isSchemaAware());
+                importedXsltFunctionLibraries.add(
+                    new StylesheetFunctionLibrary(compiler.compile(n.asSource())
+                                                          .getUnderlyingCompiledStylesheet()
+                                                          .getTopLevelPackage(),
+                                                  true));
+            }
+        }
+
+        // bind the imported XSLT functions at the beginning of the pipeline
+        if (importedXsltFunctionLibraries != null) {
+            runtime.getConfiguration().inscopeXsltFunctions.addAll(importedXsltFunctionLibraries);
+        }
+
         for (Variable var : step.getVariables()) {
             RuntimeValue value = computeValue(var);
             inScopeOptions.put(var.getName(), value);
@@ -242,6 +266,11 @@ public class XPipeline extends XCompoundStep {
 
         for (XStep step : subpipeline) {
             step.run();
+        }
+
+        // unbind the imported XSLT functions at the end of the pipeline
+        if (importedXsltFunctionLibraries != null) {
+            runtime.getConfiguration().inscopeXsltFunctions.removeAll(importedXsltFunctionLibraries);
         }
 
         for (String port : inputs.keySet()) {
