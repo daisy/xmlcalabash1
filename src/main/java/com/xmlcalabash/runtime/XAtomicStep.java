@@ -615,7 +615,11 @@ public class XAtomicStep extends XStep {
 
                 ReadablePipe pipe = null;
                 if (binding.getBindingType() == Binding.ERROR_BINDING) {
-                    pipe = ((XCatch) this).errorPipe;
+                    XStep step = this;
+                    while (!(step instanceof XCatch)) {
+                        step = step.getParent();
+                    }
+                    pipe = ((XCatch)step).errorPipe;
                 } else {
                     pipe = getPipeFromBinding(binding);
                     pipe.canReadSequence(runtime.getAllowSequenceAsContext());
