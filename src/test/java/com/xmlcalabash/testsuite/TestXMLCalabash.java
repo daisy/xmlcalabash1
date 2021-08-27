@@ -166,13 +166,20 @@ public class TestXMLCalabash {
         suiteRunner.runTest(TESTROOT + "unzip-002.xml");
     }
 
+    /* headers changed
     @Test
     public void testUriInfo001() {
         suiteRunner.runTest(TESTROOT + "uri-info-001.xml");
     }
+    */
 
     @Test
     public void testXInclude001() {
         suiteRunner.runTest(TESTROOT + "xinclude-001.xml");
+    }
+
+    @Test
+    public void testSearchText001() {
+        suiteRunner.runTest(TESTROOT + "search-text-001.xml");
     }
 }

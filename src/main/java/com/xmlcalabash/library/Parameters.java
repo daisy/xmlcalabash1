@@ -19,7 +19,9 @@
 
 package com.xmlcalabash.library;
 
+import java.util.HashMap;
 import java.util.Hashtable;
+import java.util.Iterator;
 
 import com.xmlcalabash.core.XMLCalabash;
 import com.xmlcalabash.core.XProcConstants;
@@ -27,12 +29,15 @@ import com.xmlcalabash.core.XProcRuntime;
 import com.xmlcalabash.util.TreeWriter;
 import com.xmlcalabash.model.RuntimeValue;
 import com.xmlcalabash.io.WritablePipe;
+import com.xmlcalabash.util.TypeUtils;
+import net.sf.saxon.om.AttributeMap;
+import net.sf.saxon.om.EmptyAttributeMap;
+import net.sf.saxon.om.NamespaceMap;
 import net.sf.saxon.s9api.SaxonApiException;
 import net.sf.saxon.s9api.QName;
 import net.sf.saxon.s9api.XdmValue;
 import net.sf.saxon.s9api.XdmItem;
 import net.sf.saxon.s9api.XdmAtomicValue;
-import net.sf.saxon.s9api.XdmSequenceIterator;
 import net.sf.saxon.s9api.XdmNode;
 import com.xmlcalabash.runtime.XAtomicStep;
 
@@ -54,7 +59,7 @@ public class Parameters extends DefaultStep {
     private static final QName _value = new QName("value");
     private static final QName _type = new QName("type");
     private WritablePipe result = null;
-    Hashtable<QName,RuntimeValue> parameters = new Hashtable<QName,RuntimeValue> ();
+    Hashtable<QName,RuntimeValue> parameters = new Hashtable<> ();
 
     /* Creates a new instance of Count */
     public Parameters(XProcRuntime runtime, XAtomicStep step) {
@@ -83,26 +88,26 @@ public class Parameters extends DefaultStep {
         TreeWriter treeWriter = new TreeWriter(runtime);
         treeWriter.startDocument(step.getNode().getBaseURI());
         treeWriter.addStartElement(c_param_set);
-        treeWriter.startContent();
-
+        
         for (QName param : parameters.keySet()) {
+            AttributeMap attr = EmptyAttributeMap.getInstance();
             String value = parameters.get(param).getStringValue().getStringValue();
             Hashtable<String,String> namespaceBindings = parameters.get(param).getNamespaceBindings();
-            treeWriter.addStartElement(
-                value.contains("c:") && namespaceBindings != null && namespaceBindings.containsKey("c")
-                    ? new QName(XProcConstants.NS_XPROC_STEP, "param")
-                    : c_param);
+            QName paramTag = value.contains("c:") && namespaceBindings != null && namespaceBindings.containsKey("c")
+                ? new QName(XProcConstants.NS_XPROC_STEP, "param")
+                : c_param;
+            NamespaceMap nsmap = NamespaceMap.emptyMap();
             if (namespaceBindings != null) {
                 for (String prefix : namespaceBindings.keySet())
                     if (value.contains(prefix + ":"))
-                        treeWriter.addNamespace(prefix, namespaceBindings.get(prefix));
+                        nsmap = nsmap.put(prefix, namespaceBindings.get(prefix));
             }
-            treeWriter.addAttribute(_name, param.getLocalName());
+            attr = attr.put(TypeUtils.attributeInfo(_name, param.getLocalName()));
             if (param.getNamespaceURI() != null && !"".equals(param.getNamespaceURI())) {
-                treeWriter.addAttribute(_namespace, param.getNamespaceURI());
+                attr = attr.put(TypeUtils.attributeInfo(_namespace, param.getNamespaceURI()));
             } else {
                 // I'm not really sure about this...
-                treeWriter.addAttribute(_namespace, "");
+                attr = attr.put(TypeUtils.attributeInfo(_namespace, ""));
             }
 
             if (runtime.getAllowGeneralExpressions()) {
@@ -116,42 +121,40 @@ public class Parameters extends DefaultStep {
                 }
 
                 if (atom != null && xdmvalue.size() == 1) {
-                    treeWriter.addAttribute(_value, value);
-                    treeWriter.startContent();
+                    attr = attr.put(TypeUtils.attributeInfo(_value, value));
+                    treeWriter.addStartElement(paramTag, attr, nsmap);
+                    treeWriter.addEndElement();
                 } else {
-                    treeWriter.startContent();
-                    XdmSequenceIterator iter = xdmvalue.iterator();
-                    while (iter.hasNext()) {
-                        XdmItem next = iter.next();
+                    treeWriter.addStartElement(paramTag, attr, nsmap);
+                    for (XdmItem next : xdmvalue) {
+                        AttributeMap itemattr = EmptyAttributeMap.getInstance();
                         QName type = next.isAtomicValue() ? ((XdmAtomicValue) next).getPrimitiveTypeName() : null;
 
-                        treeWriter.addStartElement(cx_item);
-
                         if (type != null) {
-                            if ("http://www.w3.org/2001/XMLSchema".equals(type.getNamespaceURI())) {
-                                treeWriter.addAttribute(_type, type.getLocalName());
+                            if (XProcConstants.NS_XMLSCHEMA.equals(type.getNamespaceURI())) {
+                                itemattr = itemattr.put(TypeUtils.attributeInfo(_type, type.getLocalName()));
                             } else {
-                                treeWriter.addAttribute(_type, type.getClarkName());
+                                itemattr = itemattr.put(TypeUtils.attributeInfo(_type, type.getClarkName()));
                             }
                         }
 
                         if (next.isAtomicValue()) {
-                            treeWriter.addAttribute(_value, next.getStringValue());
-                            treeWriter.startContent();
+                            itemattr = itemattr.put(TypeUtils.attributeInfo(_value, next.getStringValue()));
+                            treeWriter.addStartElement(cx_item, itemattr);
+                            treeWriter.addEndElement();
                         } else {
-                            treeWriter.startContent();
+                            treeWriter.addStartElement(cx_item, itemattr);
                             treeWriter.addSubtree((XdmNode) next);
+                            treeWriter.addEndElement();
                         }
-                        
-                        treeWriter.addEndElement();
                     }
-
+                    treeWriter.addEndElement();
                 }
             } else {
-                treeWriter.addAttribute(_value, value);
-                treeWriter.startContent();
+                attr = attr.put(TypeUtils.attributeInfo(_value, value));
+                treeWriter.addStartElement(paramTag, attr, nsmap);
+                treeWriter.addEndElement();
             }
-            treeWriter.addEndElement();
         }
 
         treeWriter.addEndElement();

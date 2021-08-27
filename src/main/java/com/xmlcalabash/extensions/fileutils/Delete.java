@@ -73,7 +73,6 @@ public class Delete extends DefaultStep {
         TreeWriter tree = new TreeWriter(runtime);
         tree.startDocument(step.getNode().getBaseURI());
         tree.addStartElement(XProcConstants.c_result);
-        tree.startContent();
 
         tree.addText(uri.toASCIIString());
 
@@ -100,6 +99,10 @@ public class Delete extends DefaultStep {
             } catch (IOException e) {
                 if (fail_on_error) {
                     throw new XProcException(step.getNode(), e);
+                }
+            } catch (XProcException e) {
+                if (fail_on_error) {
+                    throw e;
                 }
             }
         }

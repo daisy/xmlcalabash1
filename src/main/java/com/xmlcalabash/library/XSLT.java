@@ -27,42 +27,41 @@ import com.xmlcalabash.io.ReadablePipe;
 import com.xmlcalabash.io.WritablePipe;
 import com.xmlcalabash.model.RuntimeValue;
 import com.xmlcalabash.runtime.XAtomicStep;
-import com.xmlcalabash.util.MessageFormatter;
-import com.xmlcalabash.util.S9apiUtils;
-import com.xmlcalabash.util.TreeWriter;
-import com.xmlcalabash.util.XProcCollectionFinder;
+import com.xmlcalabash.util.*;
 import net.sf.saxon.Configuration;
-import net.sf.saxon.event.PipelineConfiguration;
-import net.sf.saxon.event.Receiver;
 import net.sf.saxon.expr.instruct.TerminationException;
-import net.sf.saxon.expr.parser.Location;
 import net.sf.saxon.lib.CollectionFinder;
+import net.sf.saxon.lib.ErrorReporter;
 import net.sf.saxon.lib.OutputURIResolver;
 import net.sf.saxon.lib.UnparsedTextURIResolver;
-import net.sf.saxon.om.NamespaceBindingSet;
-import net.sf.saxon.om.NodeName;
+import net.sf.saxon.om.AttributeMap;
+import net.sf.saxon.om.EmptyAttributeMap;
+import net.sf.saxon.om.NodeInfo;
+import net.sf.saxon.om.TreeInfo;
+import net.sf.saxon.s9api.Action;
+import net.sf.saxon.s9api.Destination;
 import net.sf.saxon.s9api.DocumentBuilder;
-import net.sf.saxon.s9api.MessageListener;
+import net.sf.saxon.s9api.MessageListener2;
 import net.sf.saxon.s9api.Processor;
 import net.sf.saxon.s9api.QName;
+import net.sf.saxon.s9api.RawDestination;
 import net.sf.saxon.s9api.SaxonApiException;
 import net.sf.saxon.s9api.Serializer;
 import net.sf.saxon.s9api.ValidationMode;
 import net.sf.saxon.s9api.XdmDestination;
+import net.sf.saxon.s9api.XdmEmptySequence;
+import net.sf.saxon.s9api.XdmItem;
 import net.sf.saxon.s9api.XdmNode;
+import net.sf.saxon.s9api.XdmValue;
+import net.sf.saxon.s9api.XmlProcessingError;
 import net.sf.saxon.s9api.XsltCompiler;
 import net.sf.saxon.s9api.XsltExecutable;
 import net.sf.saxon.s9api.XsltTransformer;
-import net.sf.saxon.trans.XPathException;
-import net.sf.saxon.type.SchemaType;
-import net.sf.saxon.type.SimpleType;
+import net.sf.saxon.tree.wrapper.RebasedDocument;
 import org.xml.sax.InputSource;
 
-import javax.xml.transform.ErrorListener;
-import javax.xml.transform.Result;
 import javax.xml.transform.SourceLocator;
 import javax.xml.transform.Transformer;
-import javax.xml.transform.TransformerConfigurationException;
 import javax.xml.transform.TransformerException;
 import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMResult;
@@ -70,9 +69,11 @@ import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.sax.SAXSource;
 import java.io.ByteArrayOutputStream;
 import java.net.URI;
-import java.net.URISyntaxException;
+import java.util.HashMap;
 import java.util.Hashtable;
+import java.util.Iterator;
 import java.util.Vector;
+import java.util.function.Function;
 
 /**
  *
@@ -95,14 +96,13 @@ public class XSLT extends DefaultStep {
     private ReadablePipe stylesheetPipe = null;
     private WritablePipe resultPipe = null;
     private WritablePipe secondaryPipe = null;
-    private Hashtable<QName,RuntimeValue> params = new Hashtable<QName,RuntimeValue> ();
-    private Hashtable<String, XdmDestination> secondaryResults = new Hashtable<String, XdmDestination> ();
+    private Hashtable<QName, RuntimeValue> params = new Hashtable<QName, RuntimeValue>();
 
     /*
      * Creates a new instance of XSLT
      */
     public XSLT(XProcRuntime runtime, XAtomicStep step) {
-        super(runtime,step);
+        super(runtime, step);
     }
 
     public void setInput(String port, ReadablePipe pipe) {
@@ -124,7 +124,7 @@ public class XSLT extends DefaultStep {
     public void setParameter(QName name, RuntimeValue value) {
         params.put(name, value);
     }
-    
+
     public void reset() {
         sourcePipe.resetReader();
         stylesheetPipe.resetReader();
@@ -140,7 +140,7 @@ public class XSLT extends DefaultStep {
             throw XProcException.dynamicError(6, step.getNode(), "No stylesheet provided.");
         }
 
-        Vector<XdmNode> defaultCollection = new Vector<XdmNode> ();
+        Vector<XdmNode> defaultCollection = new Vector<XdmNode>();
 
         while (sourcePipe.moreDocuments()) {
             defaultCollection.add(sourcePipe.read());
@@ -155,9 +155,9 @@ public class XSLT extends DefaultStep {
         if (getOption(_version) == null) {
             XdmNode ssroot = S9apiUtils.getDocumentElement(stylesheet);
             if (ssroot != null) {
-                version = ssroot.getAttributeValue(new QName("","version"));
+                version = ssroot.getAttributeValue(new QName("", "version"));
                 if (version == null) {
-                    version = ssroot.getAttributeValue(new QName("http://www.w3.org/1999/XSL/Transform","version"));
+                    version = ssroot.getAttributeValue(new QName("http://www.w3.org/1999/XSL/Transform", "version"));
                 }
             }
             if (version == null) {
@@ -166,7 +166,7 @@ public class XSLT extends DefaultStep {
         } else {
             version = getOption(_version).getString();
         }
-        
+
         // We used to check if the XSLT version was supported, but I've removed that check.
         // If it's not supported by Saxon, we'll get an error from Saxon. Otherwise, we'll
         // get the results we get.
@@ -174,7 +174,7 @@ public class XSLT extends DefaultStep {
         if ("1.0".equals(version) && defaultCollection.size() > 1) {
             throw XProcException.stepError(39);
         }
-        
+
         if ("1.0".equals(version) && runtime.getUseXslt10Processor()) {
             run10(stylesheet, document);
             return;
@@ -208,19 +208,19 @@ public class XSLT extends DefaultStep {
         CollectionFinder collectionFinder = config.getCollectionFinder();
         UnparsedTextURIResolver unparsedTextURIResolver = runtime.getResolver();
 
-        config.setOutputURIResolver(new OutputResolver());
         config.setDefaultCollection(XProcCollectionFinder.DEFAULT);
         config.setCollectionFinder(new XProcCollectionFinder(runtime, defaultCollection, collectionFinder));
 
-        XdmDestination result = null;
+        RawDestination result = null;
         ByteArrayOutputStream outputStream = null;
-
         try {
             XsltCompiler compiler = runtime.getProcessor().newXsltCompiler();
             compiler.setSchemaAware(processor.isSchemaAware());
-            compiler.setErrorListener(new LogCompileErrors());
+            compiler.setErrorReporter(new LogCompileErrors());
             XsltExecutable exec = compiler.compile(stylesheet.asSource());
             XsltTransformer transformer = exec.load();
+            transformer.setResultDocumentHandler(new DocumentHandler());
+            transformer.setErrorReporter(new LogDynamicErrors());
 
             for (QName name : params.keySet()) {
                 RuntimeValue v = params.get(name);
@@ -242,7 +242,7 @@ public class XSLT extends DefaultStep {
                 serializer.setOutputStream(outputStream);
                 transformer.setDestination(serializer);
             } else {
-                result = new XdmDestination();
+                result = new RawDestination();
                 transformer.setDestination(result);
             }
 
@@ -256,10 +256,6 @@ public class XSLT extends DefaultStep {
 
             if (outputBaseURI != null) {
                 transformer.setBaseOutputURI(outputBaseURI.toASCIIString());
-                if (result != null) {
-                    // The following hack works around https://saxonica.plan.io/issues/1724
-                    result.setBaseURI(outputBaseURI);
-                }
             }
 
             transformer.setSchemaValidationMode(ValidationMode.DEFAULT);
@@ -294,11 +290,32 @@ public class XSLT extends DefaultStep {
                     throw XProcException.javaError(sae, 0);
             }
         } finally {
-            config.setOutputURIResolver(uriResolver);
             config.setCollectionFinder(collectionFinder);
         }
 
-        XdmNode xformed = result != null ? result.getXdmNode() : null;
+        XdmValue value = result != null ? result.getXdmValue() : null;
+        XdmNode xformed = null;
+        if (value != null && value != XdmEmptySequence.getInstance()) {
+            // In XProc 1.0, the output from XSLT has to be a document. If we get a node
+            // or a sequence of nodes, then make a document out of it. Otherwise, throw
+            // an exception. Note: The RawDestination doesn't wrap nodes in a document,
+            // so this is always necessary.
+            TreeWriter docout = new TreeWriter(runtime);
+            if (document == null) {
+                docout.startDocument(null);
+            } else {
+                docout.startDocument(document.getBaseURI());
+            }
+            for (XdmValue v : value) {
+                if (v instanceof XdmNode) {
+                    docout.addSubtree((XdmNode) v);
+                } else {
+                    throw new XProcException(step.getStep(), "p:xslt returned non-XML result");
+                }
+            }
+
+            xformed = docout.getResult();
+        }
 
         // Is null when cx:serialize attribute was specified or when nothing is written to the
         // principle result tree
@@ -309,11 +326,13 @@ public class XSLT extends DefaultStep {
                 // think there might be XProc pipelines that rely on the fact that the
                 // base URI doesn't change when processed by XSLT. So we're doing it
                 // the hard way.
-                TreeWriter fixbase = new TreeWriter(runtime);
-                fixbase.startDocument(document.getBaseURI());
-                fixbase.addSubtree(xformed);
-                fixbase.endDocument();
-                xformed = fixbase.getResult();
+                //
+                // In Saxon 9.9, I switched to the RawDestination which doesn't have
+                // a base URI setter, so this is still necessary.
+                BaseURIMapper bmapper = new BaseURIMapper(document.getBaseURI().toASCIIString());
+                SystemIdMapper smapper = new SystemIdMapper();
+                TreeInfo tree = xformed.getUnderlyingNode().getTreeInfo();
+                xformed = new XdmNode(new RebasedDocument(tree, bmapper, smapper).wrap(xformed.getUnderlyingNode()));
             }
 
             // If the document isn't well-formed XML, encode it as text
@@ -326,10 +345,12 @@ public class XSLT extends DefaultStep {
                     // Document is apparently not well-formed XML.
                     TreeWriter tree = new TreeWriter(runtime);
                     tree.startDocument(xformed.getBaseURI());
-                    tree.addStartElement(XProcConstants.c_result);
-                    tree.addAttribute(_content_type, "text/plain");
-                    tree.addAttribute(cx_decode,"true");
-                    tree.startContent();
+
+                    AttributeMap attr = EmptyAttributeMap.getInstance();
+                    attr = attr.put(TypeUtils.attributeInfo(_content_type, "text/plain"));
+                    attr = attr.put(TypeUtils.attributeInfo(cx_decode, "true"));
+
+                    tree.addStartElement(XProcConstants.c_result, attr);
 
                     // Serialize the content as text so that we don't wind up with encoded XML characters
                     Serializer serializer = makeSerializer();
@@ -356,21 +377,21 @@ public class XSLT extends DefaultStep {
         if (outputStream != null) {
             TreeWriter tree = new TreeWriter(runtime);
             tree.startDocument(outputBaseURI != null ? outputBaseURI : document != null ? document.getBaseURI() : null);
-            tree.addStartElement(XProcConstants.c_result);
-            tree.addAttribute(_content_type, "text/plain");
-            tree.addAttribute(cx_decode,"true");
-            tree.startContent();
+            AttributeMap attrs = EmptyAttributeMap.getInstance();
+            attrs = attrs.put(TypeUtils.attributeInfo(_content_type, "text/plain"));
+            attrs = attrs.put(TypeUtils.attributeInfo(cx_decode, "true"));
+            tree.addStartElement(XProcConstants.c_result, attrs);
             tree.addText(outputStream.toString());
             tree.addEndElement();
             tree.endDocument();
             resultPipe.write(tree.getResult());
         }
     }
-    
+
     public void run10(XdmNode stylesheet, XdmNode document) {
         try {
             InputSource is = S9apiUtils.xdmToInputSource(runtime, stylesheet);
-            
+
             TransformerFactory tfactory = TransformerFactory.newInstance();
             Transformer transformer = tfactory.newTransformer(new SAXSource(is));
 
@@ -394,49 +415,63 @@ public class XSLT extends DefaultStep {
                 // document, but that's not allowed in Saxon 9.8.
                 resultPipe.write(xformed);
             }
-        } catch (SaxonApiException sae) {
+        } catch (SaxonApiException | TransformerException sae) {
             throw new XProcException(sae);
-        } catch (TransformerConfigurationException tce) {
-            throw new XProcException(tce);
-        } catch (TransformerException te) {
-            throw new XProcException(te);
         }
     }
 
-    class OutputResolver implements OutputURIResolver {
-        public OutputResolver() {
+    private class DocumentHandler implements Function<URI, Destination> {
+        @Override
+        public Destination apply(URI uri) {
+            XdmDestination xdmResult = new XdmDestination();
+            xdmResult.setBaseURI(uri);
+            xdmResult.onClose(new DocumentCloseAction(uri, xdmResult));
+            return xdmResult;
+        }
+    }
+
+    private class BaseURIMapper implements Function<NodeInfo, String> {
+        private String origBase = null;
+
+        public BaseURIMapper(String origBase) {
+            this.origBase = origBase;
         }
 
         @Override
-        public OutputURIResolver newInstance() {
-            return new OutputResolver();
+        public String apply(NodeInfo node) {
+            String base = node.getBaseURI();
+            if (origBase != null && (base == null) || "".equals(base)) {
+                base = origBase;
+            }
+            return base;
+        }
+    }
+
+    private class SystemIdMapper implements Function<NodeInfo, String> {
+        // This is a nop for now
+        @Override
+        public String apply(NodeInfo node) {
+            return node.getSystemId();
+        }
+    }
+
+    private class DocumentCloseAction implements Action {
+        private URI uri = null;
+        private XdmDestination destination = null;
+
+        public DocumentCloseAction(URI uri, XdmDestination destination) {
+            this.uri = uri;
+            this.destination = destination;
         }
 
-        public Result resolve(String href, String base) throws TransformerException {
-            URI baseURI = null;
-            try {
-                baseURI = new URI(base);
-                baseURI = baseURI.resolve(href);
-            } catch (URISyntaxException use) {
-                throw new XProcException(use);
-            }
+        @Override
+        public void act() throws SaxonApiException {
+            XdmNode doc = destination.getXdmNode();
 
-            logger.trace(MessageFormatter.nodeMessage(step.getNode(), "XSLT secondary result document: " + baseURI));
-
-            try {
-                XdmDestination xdmResult = new XdmDestination();
-                secondaryResults.put(baseURI.toASCIIString(), xdmResult);
-                Receiver receiver = xdmResult.getReceiver(runtime.getProcessor().getUnderlyingConfiguration());
-                return new FixedSysidReceiver(receiver, baseURI.toASCIIString());
-            } catch (SaxonApiException sae) {
-                throw new XProcException(sae);
-            }
-        }
-
-        public void close(Result result) throws TransformerException {
-            String href = result.getSystemId();
-            XdmDestination xdmResult = secondaryResults.get(href);
-            XdmNode doc = xdmResult.getXdmNode();
+            BaseURIMapper bmapper = new BaseURIMapper(doc.getBaseURI().toASCIIString());
+            SystemIdMapper smapper = new SystemIdMapper();
+            TreeInfo treeinfo = doc.getUnderlyingNode().getTreeInfo();
+            doc = new XdmNode(new RebasedDocument(treeinfo, bmapper, smapper).wrap(doc.getUnderlyingNode()));
 
             try {
                 S9apiUtils.assertDocument(doc);
@@ -447,10 +482,13 @@ public class XSLT extends DefaultStep {
                     // Document is apparently not well-formed XML.
                     TreeWriter tree = new TreeWriter(runtime);
                     tree.startDocument(doc.getBaseURI());
-                    tree.addStartElement(XProcConstants.c_result);
-                    tree.addAttribute(_content_type, "text/plain");
-                    tree.addAttribute(cx_decode, "true");
-                    tree.startContent();
+
+                    AttributeMap attr = EmptyAttributeMap.getInstance();
+                    attr = attr.put(TypeUtils.attributeInfo(_content_type, "text/plain"));
+                    attr = attr.put(TypeUtils.attributeInfo(cx_decode, "true"));
+
+                    tree.addStartElement(XProcConstants.c_result, attr);
+
                     tree.addText(doc.toString());
                     tree.addEndElement();
                     tree.endDocument();
@@ -462,11 +500,11 @@ public class XSLT extends DefaultStep {
         }
     }
 
-    class CatchMessages implements MessageListener {
+    class CatchMessages implements MessageListener2 {
         
         XdmNode terminatingMessage = null;
 
-        public void message(XdmNode content, boolean terminate, SourceLocator locator) {
+        public void message(XdmNode content, QName errorCode, boolean terminate, SourceLocator locator) {
             if (runtime.getShowMessages()) {
                 System.err.println(content.toString());
             }
@@ -474,7 +512,7 @@ public class XSLT extends DefaultStep {
             TreeWriter treeWriter = new TreeWriter(runtime);
             treeWriter.startDocument(content.getBaseURI());
             treeWriter.addStartElement(XProcConstants.c_error);
-            treeWriter.startContent();
+
             treeWriter.addSubtree(content);
             treeWriter.addEndElement();
             treeWriter.endDocument();
@@ -493,118 +531,22 @@ public class XSLT extends DefaultStep {
         }
     }
 
-    private static class FixedSysidReceiver implements Receiver
-    {
-        private final String   mySysid;
-        private final Receiver myWrapped;
-
-        public FixedSysidReceiver(Receiver wrapped, String sysid) {
-            mySysid   = sysid;
-            myWrapped = wrapped;
-            myWrapped.setSystemId(sysid);
-        }
-
-        @Override
-        public void open() throws XPathException {
-            myWrapped.open();
-        }
-
-        @Override
-        public void setUnparsedEntity(String name, String sysid, String pubid) throws XPathException {
-            myWrapped.setUnparsedEntity(name, sysid, pubid);
-        }
-
-        @Override
-        public String getSystemId() {
-            return mySysid;
-        }
-
-        @Override
-        public void setSystemId(String sysid) {
-            // propagate it to the wrapped receiver, but do not take it into account here...
-            myWrapped.setSystemId(sysid);
-        }
-
-        @Override
-        public void setPipelineConfiguration(PipelineConfiguration conf) {
-            myWrapped.setPipelineConfiguration(conf);
-        }
-
-        @Override
-        public void startDocument(int i) throws XPathException {
-            myWrapped.startDocument(i);
-        }
-
-        @Override
-        public void endDocument() throws XPathException {
-            myWrapped.endDocument();
-        }
-
-        @Override
-        public void startElement(NodeName name, SchemaType st, Location loc, int i) throws XPathException {
-            myWrapped.startElement(name, st, loc, i);
-        }
-
-        @Override
-        public void namespace(NamespaceBindingSet namespaceBindings, int properties) throws XPathException {
-            myWrapped.namespace(namespaceBindings, properties);
-        }
-
-        @Override
-        public void attribute(NodeName name, SimpleType st, CharSequence cs, Location loc, int i) throws XPathException {
-            myWrapped.attribute(name, st, cs, loc, i);
-        }
-
-        @Override
-        public void startContent() throws XPathException {
-            myWrapped.startContent();
-        }
-
-        @Override
-        public void endElement() throws XPathException {
-            myWrapped.endElement();
-        }
-
-        @Override
-        public void characters(CharSequence cs, Location loc, int i) throws XPathException {
-            myWrapped.characters(cs, loc, i);
-        }
-
-        @Override
-        public void processingInstruction(String string, CharSequence cs, Location loc, int i) throws XPathException {
-            myWrapped.processingInstruction(string, cs, loc, i);
-        }
-
-        @Override
-        public void comment(CharSequence cs, Location loc, int i) throws XPathException {
-            myWrapped.comment(cs, loc, i);
-        }
-
-        @Override
-        public void close() throws XPathException {
-            myWrapped.close();
-        }
-
-        @Override
-        public boolean usesTypeAnnotations() {
-            return myWrapped.usesTypeAnnotations();
-        }
-
-        @Override
-        public PipelineConfiguration getPipelineConfiguration() {
-            return myWrapped.getPipelineConfiguration();
+    class LogCompileErrors implements ErrorReporter {
+        public void report(XmlProcessingError error) {
+            if (error.isWarning())
+                logger.warn(error.getMessage());
+            else
+                logger.error(error.getMessage());
         }
     }
-    
-    class LogCompileErrors implements ErrorListener {
-        public void error(TransformerException exception) {
-            logger.error(exception.getMessage());
-        }
-        public void fatalError(TransformerException exception) {
-            logger.error(exception.getMessage());
-        }
-        public void warning(TransformerException exception) {
-            logger.warn(exception.getMessage());
+
+    class LogDynamicErrors implements ErrorReporter {
+        public void report(XmlProcessingError error) {
+            if (error.isWarning())
+                logger.warn(error.getMessage());
+            else
+                ; // error will cause TransformerException
         }
     }
 }
+

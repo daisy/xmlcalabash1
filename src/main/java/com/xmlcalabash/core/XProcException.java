@@ -31,7 +31,7 @@ import net.sf.saxon.expr.instruct.NamedTemplate;
 import net.sf.saxon.expr.instruct.TemplateRule;
 import net.sf.saxon.expr.instruct.TerminationException;
 import net.sf.saxon.expr.instruct.UserFunction;
-import net.sf.saxon.expr.parser.ExplicitLocation;
+import net.sf.saxon.expr.parser.Loc;
 import net.sf.saxon.expr.parser.XPathParser;
 import net.sf.saxon.expr.XPathContext;
 import net.sf.saxon.lib.NamespaceConstant;
@@ -545,7 +545,7 @@ public class XProcException extends RuntimeException {
             }
         }
         if (loc == null)
-            loc = ExplicitLocation.UNKNOWN_LOCATION;
+            loc = Loc.NONE;
         if (loc instanceof XPathParser.NestedLocation)
             loc = ((XPathParser.NestedLocation)loc).getContainingLocation();
         String instructionName = getInstructionName(loc);
@@ -582,7 +582,7 @@ public class XProcException extends RuntimeException {
         } else if (loc instanceof ValidationException && ((ValidationException)loc).getNode() != null) {
             return (((ValidationException)loc).getNode()).getDisplayName();
         } else if (loc instanceof Instruction) {
-            return StandardErrorListener.getInstructionName((Instruction)loc);
+            return StandardErrorListener.getInstructionNameDefault((Instruction)loc);
         } else if (loc instanceof Actor) {
             return getInstructionName((Actor)loc);
         } else {
@@ -616,7 +616,7 @@ public class XProcException extends RuntimeException {
     }
 
     private static String getInstructionName(Actor actor) {
-        StructuredQName name = actor.getObjectName();
+        StructuredQName name = actor.getComponentName();
         String objectName = name == null ? "" : name.getDisplayName();
         if (actor instanceof UserFunction) {
             return "function " + objectName + "()";

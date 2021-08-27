@@ -14,6 +14,7 @@ import com.xmlcalabash.util.Output;
 import com.xmlcalabash.util.S9apiUtils;
 import com.xmlcalabash.util.URIUtils;
 import net.sf.saxon.Version;
+import net.sf.saxon.lib.Feature;
 import net.sf.saxon.om.NoElementsSpaceStrippingRule;
 import net.sf.saxon.s9api.Axis;
 import net.sf.saxon.s9api.DocumentBuilder;
@@ -44,29 +45,18 @@ import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.URL;
-import java.net.URLDecoder;
+import java.net.*;
 import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Hashtable;
-import java.util.Vector;
+import java.util.*;
 import java.util.jar.JarFile;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 
 import static com.xmlcalabash.util.URIUtils.encode;
 import static java.lang.String.format;
 import static java.lang.System.getProperty;
 
-/**
- * Created by IntelliJ IDEA.
- * User: ndw
- * Date: Nov 11, 2008
- * Time: 7:47:38 PM
- * To change this template use File | Settings | File Templates.
- */
 public class XProcConfiguration {
     public static final QName _prefix = new QName("", "prefix");
     public static final QName _uri = new QName("", "uri");
@@ -115,15 +105,17 @@ public class XProcConfiguration {
     public String mailPass = null;
     public Hashtable<String,String> loaders = new Hashtable<String,String> ();
     public HashSet<String> setSaxonProperties = new HashSet<String>();
+    public Hashtable<String,String> proxies = new Hashtable<String,String> ();
 
     public boolean extensionValues = false;
     public boolean xpointerOnText = false;
     public boolean transparentJSON = false;
+    public boolean ignoreInvalidXmlBase = false;
     public String jsonFlavor = JSONtoXML.MARKLOGIC;
     public boolean useXslt10 = false;
     public boolean htmlSerializer = false;
     public boolean allowTextResults = false;
-    public Vector<String> catalogs = new Vector<String> ();
+    public Vector<String> catalogs = new Vector<> ();
 
     public int piperackPort = 8088;
     public int piperackDefaultExpires = 300;
@@ -132,6 +124,118 @@ public class XProcConfiguration {
     private Processor cfgProcessor = null;
     private boolean firstInput = false;
     private boolean firstOutput = false;
+
+    private static HashMap<String,Feature<Boolean>> bFeatureMap = new HashMap<String,Feature<Boolean>> ();
+    private static HashMap<String,Feature<Integer>> iFeatureMap = new HashMap<String,Feature<Integer>> ();
+    private static HashMap<String,Feature<String>> sFeatureMap = new HashMap<String,Feature<String>> ();
+    static {
+        bFeatureMap.put("http://saxon.sf.net/feature/allow-external-functions", Feature.ALLOW_EXTERNAL_FUNCTIONS);
+        bFeatureMap.put("http://saxon.sf.net/feature/allow-multithreading", Feature.ALLOW_MULTITHREADING);
+        bFeatureMap.put("http://saxon.sf.net/feature/allow-old-java-uri-format", Feature.ALLOW_OLD_JAVA_URI_FORMAT);
+        bFeatureMap.put("http://saxon.sf.net/feature/allowSyntaxExtensions", Feature.ALLOW_SYNTAX_EXTENSIONS);
+        bFeatureMap.put("http://saxon.sf.net/feature/assertionsCanSeeComments", Feature.ASSERTIONS_CAN_SEE_COMMENTS);
+        sFeatureMap.put("http://saxon.sf.net/feature/collation-uri-resolver-class", Feature.COLLATION_URI_RESOLVER_CLASS);
+        sFeatureMap.put("http://saxon.sf.net/feature/collection-finder-class", Feature.COLLECTION_FINDER_CLASS);
+        //x10 sFeatureMap.put("http://saxon.sf.net/feature/collection-uri-resolver-class", Feature.COLLECTION_URI_RESOLVER_CLASS);
+        bFeatureMap.put("http://saxon.sf.net/feature/compile-with-tracing", Feature.COMPILE_WITH_TRACING);
+        sFeatureMap.put("http://saxon.sf.net/feature/configuration-file", Feature.CONFIGURATION_FILE);
+        bFeatureMap.put("http://saxon.sf.net/feature/debugByteCode", Feature.DEBUG_BYTE_CODE);
+        sFeatureMap.put("http://saxon.sf.net/feature/debugByteCodeDir", Feature.DEBUG_BYTE_CODE_DIR);
+        sFeatureMap.put("http://saxon.sf.net/feature/defaultCollation", Feature.DEFAULT_COLLATION);
+        sFeatureMap.put("http://saxon.sf.net/feature/defaultCollection", Feature.DEFAULT_COLLECTION);
+        sFeatureMap.put("http://saxon.sf.net/feature/defaultCountry", Feature.DEFAULT_COUNTRY);
+        sFeatureMap.put("http://saxon.sf.net/feature/defaultLanguage", Feature.DEFAULT_LANGUAGE);
+        sFeatureMap.put("http://saxon.sf.net/feature/defaultRegexEngine", Feature.DEFAULT_REGEX_ENGINE);
+        bFeatureMap.put("http://saxon.sf.net/feature/disableXslEvaluate", Feature.DISABLE_XSL_EVALUATE);
+        bFeatureMap.put("http://saxon.sf.net/feature/displayByteCode", Feature.DISPLAY_BYTE_CODE);
+        bFeatureMap.put("http://saxon.sf.net/feature/validation", Feature.DTD_VALIDATION);
+        bFeatureMap.put("http://saxon.sf.net/feature/dtd-validation-recoverable", Feature.DTD_VALIDATION_RECOVERABLE);
+        bFeatureMap.put("http://saxon.sf.net/feature/eagerEvaluation", Feature.EAGER_EVALUATION);
+        sFeatureMap.put("http://saxon.sf.net/feature/entityResolverClass", Feature.ENTITY_RESOLVER_CLASS);
+        sFeatureMap.put("http://saxon.sf.net/feature/environmentVariableResolverClass", Feature.ENVIRONMENT_VARIABLE_RESOLVER_CLASS);
+        sFeatureMap.put("http://saxon.sf.net/feature/errorListenerClass", Feature.ERROR_LISTENER_CLASS);
+        bFeatureMap.put("http://saxon.sf.net/feature/expandAttributeDefaults", Feature.EXPAND_ATTRIBUTE_DEFAULTS);
+        bFeatureMap.put("http://saxon.sf.net/feature/expathFileDeleteTemporaryFiles", Feature.EXPATH_FILE_DELETE_TEMPORARY_FILES);
+        bFeatureMap.put("http://saxon.sf.net/feature/generateByteCode", Feature.GENERATE_BYTE_CODE);
+        bFeatureMap.put("http://saxon.sf.net/feature/ignoreSAXSourceParser", Feature.IGNORE_SAX_SOURCE_PARSER);
+        bFeatureMap.put("http://saxon.sf.net/feature/implicitSchemaImports", Feature.IMPLICIT_SCHEMA_IMPORTS);
+        bFeatureMap.put("http://saxon.sf.net/feature/lazyConstructionMode", Feature.LAZY_CONSTRUCTION_MODE);
+        sFeatureMap.put("http://saxon.sf.net/feature/licenseFileLocation", Feature.LICENSE_FILE_LOCATION);
+        bFeatureMap.put("http://saxon.sf.net/feature/linenumbering", Feature.LINE_NUMBERING);
+        bFeatureMap.put("http://saxon.sf.net/feature/markDefaultedAttributes", Feature.MARK_DEFAULTED_ATTRIBUTES);
+        iFeatureMap.put("http://saxon.sf.net/feature/maxCompiledClasses", Feature.MAX_COMPILED_CLASSES);
+        sFeatureMap.put("http://saxon.sf.net/feature/messageEmitterClass", Feature.MESSAGE_EMITTER_CLASS);
+        sFeatureMap.put("http://saxon.sf.net/feature/moduleURIResolverClass", Feature.MODULE_URI_RESOLVER_CLASS);
+        bFeatureMap.put("http://saxon.sf.net/feature/monitorHotSpotByteCode", Feature.MONITOR_HOT_SPOT_BYTE_CODE);
+        bFeatureMap.put("http://saxon.sf.net/feature/multipleSchemaImports", Feature.MULTIPLE_SCHEMA_IMPORTS);
+        sFeatureMap.put("http://saxon.sf.net/feature/outputURIResolverClass", Feature.OUTPUT_URI_RESOLVER_CLASS);
+        bFeatureMap.put("http://saxon.sf.net/feature/preEvaluateDocFunction", Feature.PRE_EVALUATE_DOC_FUNCTION);
+        bFeatureMap.put("http://saxon.sf.net/feature/preferJaxpParser", Feature.PREFER_JAXP_PARSER);
+        bFeatureMap.put("http://saxon.sf.net/feature/recognize-uri-query-parameters", Feature.RECOGNIZE_URI_QUERY_PARAMETERS);
+        iFeatureMap.put("http://saxon.sf.net/feature/recoveryPolicy", Feature.RECOVERY_POLICY);
+        sFeatureMap.put("http://saxon.sf.net/feature/recoveryPolicyName", Feature.RECOVERY_POLICY_NAME);
+        iFeatureMap.put("http://saxon.sf.net/feature/resultDocumentThreads", Feature.RESULT_DOCUMENT_THREADS);
+        bFeatureMap.put("http://saxon.sf.net/feature/retain-dtd-attribute-types", Feature.RETAIN_DTD_ATTRIBUTE_TYPES);
+        sFeatureMap.put("http://saxon.sf.net/feature/schemaURIResolverClass", Feature.SCHEMA_URI_RESOLVER_CLASS);
+        iFeatureMap.put("http://saxon.sf.net/feature/schema-validation", Feature.SCHEMA_VALIDATION);
+        sFeatureMap.put("http://saxon.sf.net/feature/schema-validation-mode", Feature.SCHEMA_VALIDATION_MODE);
+        sFeatureMap.put("http://saxon.sf.net/feature/serializerFactoryClass", Feature.SERIALIZER_FACTORY_CLASS);
+        sFeatureMap.put("http://saxon.sf.net/feature/sourceParserClass", Feature.SOURCE_PARSER_CLASS);
+        sFeatureMap.put("http://saxon.sf.net/feature/sourceResolverClass", Feature.SOURCE_RESOLVER_CLASS);
+        bFeatureMap.put("http://saxon.sf.net/feature/stableCollectionUri", Feature.STABLE_COLLECTION_URI);
+        bFeatureMap.put("http://saxon.sf.net/feature/stableUnparsedText", Feature.STABLE_UNPARSED_TEXT);
+        sFeatureMap.put("http://saxon.sf.net/feature/standardErrorOutputFile", Feature.STANDARD_ERROR_OUTPUT_FILE);
+        sFeatureMap.put("http://saxon.sf.net/feature/streamability", Feature.STREAMABILITY);
+        bFeatureMap.put("http://saxon.sf.net/feature/strictStreamability", Feature.STRICT_STREAMABILITY);
+        bFeatureMap.put("http://saxon.sf.net/feature/streamingFallback", Feature.STREAMING_FALLBACK);
+        sFeatureMap.put("http://saxon.sf.net/feature/strip-whitespace", Feature.STRIP_WHITESPACE);
+        sFeatureMap.put("http://saxon.sf.net/feature/styleParserClass", Feature.STYLE_PARSER_CLASS);
+        bFeatureMap.put("http://saxon.sf.net/feature/suppressEvaluationExpiryWarning", Feature.SUPPRESS_EVALUATION_EXPIRY_WARNING);
+        bFeatureMap.put("http://saxon.sf.net/feature/suppressXPathWarnings", Feature.SUPPRESS_XPATH_WARNINGS);
+        bFeatureMap.put("http://saxon.sf.net/feature/suppressXsltNamespaceCheck", Feature.SUPPRESS_XSLT_NAMESPACE_CHECK);
+        iFeatureMap.put("http://saxon.sf.net/feature/thresholdForCompilingTypes", Feature.THRESHOLD_FOR_COMPILING_TYPES);
+        bFeatureMap.put("http://saxon.sf.net/feature/timing", Feature.TIMING);
+        bFeatureMap.put("http://saxon.sf.net/feature/trace-external-functions", Feature.TRACE_EXTERNAL_FUNCTIONS);
+        sFeatureMap.put("http://saxon.sf.net/feature/traceListenerClass", Feature.TRACE_LISTENER_CLASS);
+        sFeatureMap.put("http://saxon.sf.net/feature/traceListenerOutputFile", Feature.TRACE_LISTENER_OUTPUT_FILE);
+        bFeatureMap.put("http://saxon.sf.net/feature/trace-optimizer-decisions", Feature.TRACE_OPTIMIZER_DECISIONS);
+        iFeatureMap.put("http://saxon.sf.net/feature/treeModel", Feature.TREE_MODEL);
+        sFeatureMap.put("http://saxon.sf.net/feature/treeModelName", Feature.TREE_MODEL_NAME);
+        sFeatureMap.put("http://saxon.sf.net/feature/unparsedTextURIResolverClass", Feature.UNPARSED_TEXT_URI_RESOLVER_CLASS);
+        sFeatureMap.put("http://saxon.sf.net/feature/uriResolverClass", Feature.URI_RESOLVER_CLASS);
+        bFeatureMap.put("http://saxon.sf.net/feature/use-pi-disable-output-escaping", Feature.USE_PI_DISABLE_OUTPUT_ESCAPING);
+        bFeatureMap.put("http://saxon.sf.net/feature/use-typed-value-cache", Feature.USE_TYPED_VALUE_CACHE);
+        bFeatureMap.put("http://saxon.sf.net/feature/useXsiSchemaLocation", Feature.USE_XSI_SCHEMA_LOCATION);
+        bFeatureMap.put("http://saxon.sf.net/feature/validation-comments", Feature.VALIDATION_COMMENTS);
+        bFeatureMap.put("http://saxon.sf.net/feature/validation-warnings", Feature.VALIDATION_WARNINGS);
+        bFeatureMap.put("http://saxon.sf.net/feature/version-warning", Feature.VERSION_WARNING);
+        bFeatureMap.put("http://saxon.sf.net/feature/xinclude-aware", Feature.XINCLUDE);
+        sFeatureMap.put("http://saxon.sf.net/feature/xml-version", Feature.XML_VERSION);
+        bFeatureMap.put("http://saxon.sf.net/feature/parserFeature?uri=", Feature.XML_PARSER_FEATURE);
+        bFeatureMap.put("http://saxon.sf.net/feature/parserProperty?uri=", Feature.XML_PARSER_PROPERTY);
+        bFeatureMap.put("http://saxon.sf.net/feature/xqueryAllowUpdate", Feature.XQUERY_ALLOW_UPDATE);
+        sFeatureMap.put("http://saxon.sf.net/feature/xqueryConstructionMode", Feature.XQUERY_CONSTRUCTION_MODE);
+        bFeatureMap.put("http://saxon.sf.net/feature/xqueryEmptyLeast", Feature.XQUERY_EMPTY_LEAST);
+        bFeatureMap.put("http://saxon.sf.net/feature/xqueryInheritNamespaces", Feature.XQUERY_INHERIT_NAMESPACES);
+        bFeatureMap.put("http://saxon.sf.net/feature/xqueryMultipleModuleImports", Feature.XQUERY_MULTIPLE_MODULE_IMPORTS);
+        bFeatureMap.put("http://saxon.sf.net/feature/xqueryPreserveBoundarySpace", Feature.XQUERY_PRESERVE_BOUNDARY_SPACE);
+        bFeatureMap.put("http://saxon.sf.net/feature/xqueryPreserveNamespaces", Feature.XQUERY_PRESERVE_NAMESPACES);
+        sFeatureMap.put("http://saxon.sf.net/feature/xqueryRequiredContextItemType", Feature.XQUERY_REQUIRED_CONTEXT_ITEM_TYPE);
+        bFeatureMap.put("http://saxon.sf.net/feature/xquerySchemaAware", Feature.XQUERY_SCHEMA_AWARE);
+        sFeatureMap.put("http://saxon.sf.net/feature/xqueryStaticErrorListenerClass", Feature.XQUERY_STATIC_ERROR_LISTENER_CLASS);
+        sFeatureMap.put("http://saxon.sf.net/feature/xqueryVersion", Feature.XQUERY_VERSION);
+        sFeatureMap.put("http://saxon.sf.net/feature/xsd-version", Feature.XSD_VERSION);
+        bFeatureMap.put("http://saxon.sf.net/feature/enableAssertions", Feature.XSLT_ENABLE_ASSERTIONS);
+        sFeatureMap.put("http://saxon.sf.net/feature/initialMode", Feature.XSLT_INITIAL_MODE);
+        sFeatureMap.put("http://saxon.sf.net/feature/initialTemplate", Feature.XSLT_INITIAL_TEMPLATE);
+        bFeatureMap.put("http://saxon.sf.net/feature/xsltSchemaAware", Feature.XSLT_SCHEMA_AWARE);
+        sFeatureMap.put("http://saxon.sf.net/feature/stylesheetErrorListener", Feature.XSLT_STATIC_ERROR_LISTENER_CLASS);
+        sFeatureMap.put("http://saxon.sf.net/feature/stylesheetURIResolver", Feature.XSLT_STATIC_URI_RESOLVER_CLASS);
+        sFeatureMap.put("http://saxon.sf.net/feature/xsltVersion", Feature.XSLT_VERSION);
+        iFeatureMap.put("http://saxon.sf.net/feature/regexBacktrackingLimit", Feature.REGEX_BACKTRACKING_LIMIT);
+        iFeatureMap.put("http://saxon.sf.net/feature/xpathVersionForXsd", Feature.XPATH_VERSION_FOR_XSD);
+        iFeatureMap.put("http://saxon.sf.net/feature/xpathVersionForXslt", Feature.XPATH_VERSION_FOR_XSLT);
+    }
 
     public XProcConfiguration() {
         logger = LoggerFactory.getLogger(this.getClass());
@@ -220,14 +324,15 @@ public class XProcConfiguration {
         saxonProcessor = Version.softwareEdition.toLowerCase();
         findStepClasses();
         findExtensionFunctions();
+        findImplConfiguration();
 
         String classPath = System.getProperty("java.class.path");
         String[] pathElements = classPath.split(System.getProperty("path.separator"));
         for (String path : pathElements) {
             // Make the path absolute wrt the cwd so that it can be opened later regardless of context
             path = new File(path).getAbsolutePath();
-            String jarFileURL = URLDecoder.decode(new File(path).toURI().toString().replace("+", "%2B"));
             try {
+                String jarFileURL = URLDecoder.decode(new File(path).toURI().toString().replace("+", "%2B"), "UTF-8");
                 JarFile jar = new JarFile(path);
                 ZipEntry catalog = jar.getEntry("catalog.xml");
                 if (catalog != null) {
@@ -248,7 +353,7 @@ public class XProcConfiguration {
                 catfn += "catalog.xml";
                 File f = new File(catfn);
                 if (f.exists() && f.isFile()) {
-                    catalogs.add(catfn);
+                    catalogs.add(f.toURI().toString());
                     logger.debug("Using catalog: " + catfn);
                 }
             }
@@ -277,9 +382,7 @@ public class XProcConfiguration {
 
                 SAXSource source = new SAXSource(new InputSource(instream));
                 cfgProcessor = new Processor(source);
-            } catch (FileNotFoundException e) {
-                throw new XProcException(e);
-            } catch (SaxonApiException e) {
+            } catch (FileNotFoundException | SaxonApiException e) {
                 throw new XProcException(e);
             }
         } else {
@@ -323,7 +426,7 @@ public class XProcConfiguration {
                             }
                         }
                     else
-                        logger.warn("file " + path + " does not exist");
+                        logger.debug("file " + path + " does not exist");
                 } else {
                     // not in OSGi context after all
                 }
@@ -338,34 +441,114 @@ public class XProcConfiguration {
     }
 
     private void findStepClasses() {
+        logger.debug("Current implementations: " + implementations.size());
+        logger.debug("Searching for implementations:");
         Iterable<Class<?>> classes = findClasses(XMLCalabash.class);
         for (Class<?> klass : classes) {
             XMLCalabash annotation = klass.getAnnotation(XMLCalabash.class);
             for (String clarkName: annotation.type().split("\\s+")) {
                 try {
                     QName name = QName.fromClarkName(clarkName);
-                    logger.trace("Found step type annotation: " + clarkName);
+                    logger.debug("Found step type annotation: " + clarkName);
                     if (implementations.containsKey(name)) {
                         logger.debug("Ignoring step type annotation for configured step: " + clarkName);
+                    } else {
+                        implementations.put(name, klass);
                     }
-                    implementations.put(name, klass);
                 } catch (IllegalArgumentException iae) {
                     logger.debug("Failed to parse step annotation type: " + clarkName);
                 }
             }
         }
+        logger.debug("After search: " + implementations.size());
     }
 
     private void findExtensionFunctions() {
+        logger.debug("Searching for Saxon extension functions on the class path");
         Iterable<Class<?>> classes = findClasses(SaxonExtensionFunction.class);
         for (Class<?> klass : classes) {
             String name = klass.getCanonicalName();
             SaxonExtensionFunction annotation = klass.getAnnotation(SaxonExtensionFunction.class);
-            logger.trace("Found Saxon extension function: " + klass.getCanonicalName());
+            logger.debug("Found Saxon extension function: " + klass.getCanonicalName());
             if (extensionFunctions.containsKey(name)) {
                 logger.debug("Duplicate saxon extension function class: " + name);
             }
             extensionFunctions.put(name, annotation);
+        }
+    }
+
+    private void findImplConfiguration() {
+        try {
+            Enumeration<URL> uriEnum = this.getClass().getClassLoader().getResources("com.xmlcalabash.properties");
+            while (uriEnum.hasMoreElements()) {
+                URL url = uriEnum.nextElement();
+                logger.debug("Loading properties: " + url);
+
+                URLConnection conn = url.openConnection();
+                InputStream stream = conn.getInputStream();
+                Properties props = new Properties();
+                props.load(stream);
+
+                HashMap<String,String> nsmap = new HashMap<String,String>();
+                Pattern nsPattern = Pattern.compile("namespace\\s+(.+)$");
+                Pattern sPattern = Pattern.compile("step\\s+(.+)$");
+                Pattern qPattern = Pattern.compile("^([^:]+):([^:]+)$");
+
+                // Properties are unordered so find the namespace bindings
+                for (String name : props.stringPropertyNames()) {
+                    String value = (String) props.get(name);
+                    Matcher matcher = nsPattern.matcher(value);
+                    if (matcher.matches()) {
+                        if (nsmap.containsKey(name)) {
+                            throw new XProcException("Cannot redefine namespace bindings in property file");
+                        }
+                        nsmap.put(name, matcher.group(1));
+                    }
+                }
+
+                for (String name : props.stringPropertyNames()) {
+                    String value = (String) props.get(name);
+
+                    Matcher nsMatcher = nsPattern.matcher(value);
+                    Matcher sMatcher = sPattern.matcher(value);
+
+                    if (nsMatcher.matches()) {
+                        // nop
+                    } else if (sMatcher.matches()) {
+                        String qnames = sMatcher.group(1);
+                        for (String lexQName : qnames.split("\\s*,\\s*")) {
+                            Matcher qMatcher = qPattern.matcher(lexQName);
+                            if (qMatcher.matches()) {
+                                String pfx = qMatcher.group(1);
+                                String local = qMatcher.group(2);
+
+                                if (nsmap.containsKey(pfx)) {
+                                    try {
+                                        QName qname = new QName(pfx, nsmap.get(pfx), local);
+                                        if (implementations.containsKey(qname)) {
+                                            logger.debug("Ignoring step property for configured step: " + qname.getClarkName());
+                                        } else {
+                                            Class<?> klass = Class.forName(name);
+                                            logger.debug("Loaded step from property: " + qname.getClarkName());
+                                            implementations.put(qname, klass);
+                                        }
+                                    } catch (ClassNotFoundException cfne) {
+                                        logger.debug("Class not found, ignoring: " + name + " = " + value);
+                                    }
+                                } else {
+                                    logger.debug("No namespace binding for " + pfx + ", ignoring: " + name + "=" + value);
+                                }
+                            } else {
+                                logger.debug("Unparseable step QName: " + lexQName);
+                            }
+                        }
+                    } else {
+                        logger.debug("Unparseable property, ignoring: " + name + " = " + value);
+                    }
+                }
+            }
+        } catch (IOException ex) {
+            logger.debug("Loading properties: " + ex.getMessage());
         }
     }
 
@@ -461,6 +644,7 @@ public class XProcConfiguration {
         extensionValues = "true".equals(System.getProperty("com.xmlcalabash.general-values", ""+extensionValues));
         xpointerOnText = "true".equals(System.getProperty("com.xmlcalabash.xpointer-on-text", ""+xpointerOnText));
         transparentJSON = "true".equals(System.getProperty("com.xmlcalabash.transparent-json", ""+transparentJSON));
+        ignoreInvalidXmlBase = "true".equals(System.getProperty("com.xmlcalabash.ignore-invalid-xml-base", ""+ignoreInvalidXmlBase));
         allowTextResults = "true".equals(System.getProperty("com.xmlcalabash.allow-text-results", ""+allowTextResults));
         safeMode = "true".equals(System.getProperty("com.xmlcalabash.safe-mode", ""+safeMode));
         jsonFlavor = System.getProperty("com.xmlcalabash.json-flavor", jsonFlavor);
@@ -477,6 +661,14 @@ public class XProcConfiguration {
         mailPort = System.getProperty("com.xmlcalabash.mail-port", mailPort);
         mailUser = System.getProperty("com.xmlcalabash.mail-username", mailUser);
         mailPass = System.getProperty("com.xmlcalabash.mail-password", mailPass);
+
+        if ("true".equals(System.getProperty("proxySet"))) {
+            String host = System.getProperty("proxyHost");
+            String port = System.getProperty("proxyPort");
+            if (host != null && port != null) {
+                proxies.put("http", host + ":" + port);
+            }
+        }
 
         if (System.getProperty("com.xmlcalabash.log-style") != null) {
             String s = System.getProperty("com.xmlcalabash.log-style");
@@ -504,7 +696,7 @@ public class XProcConfiguration {
         String[] boolSerNames = new String[] {"byte-order-mark", "escape-uri-attributes",
                 "include-content-type","indent", "omit-xml-declaration", "undeclare-prefixes"};
         String[] strSerNames = new String[] {"doctype-public", "doctype-system", "encoding",
-                "media-type", "normalization-form", "version", "standalone"};
+                "media-type", "normalization-form", "version", "standalone", "cdata-section-elements"};
 
         for (String name : boolSerNames) {
             String s = System.getProperty("com.xmlcalabash.serial."+name);
@@ -519,8 +711,6 @@ public class XProcConfiguration {
                 serializationOptions.put(name, s);
             }
         }
-
-        // cdata-section-elements is ignored
 
         String method = System.getProperty("com.xmlcalabash.serial.method");
         if ("html".equals(method) || "xhtml".equals(method) || "text".equals(method) || "xml".equals(method)) {
@@ -620,6 +810,8 @@ public class XProcConfiguration {
                     saxonConfigurationProperty(node);
                 } else if ("log-style".equals(localName)) {
                     logStyle(node);
+                } else if ("proxy".equals(localName)) {
+                    parseProxy(node);
                 } else if ("pipeline-loader".equals(localName)) {
                     pipelineLoader(node);
                 } else if ("piperack-port".equals(localName)) {
@@ -695,7 +887,7 @@ public class XProcConfiguration {
             System.out.print(runtime.getConfiguration().getProcessor().getUnderlyingConfiguration().getEditionCode());
             System.out.println(" edition.");
         }
-        System.out.println("Copyright (c) 2007-2013 Norman Walsh");
+        System.out.println("Copyright (c) 2007-2019 Norman Walsh");
         System.out.println("See docs/notices/NOTICES in the distribution for licensing");
         System.out.println("See also http://xmlcalabash.com/ for more information");
         System.out.println("");
@@ -754,26 +946,41 @@ public class XProcConfiguration {
 
     private void parseEntityResolver(XdmNode node) {
         String value = node.getAttributeValue(_class_name);
+        if (value == null) {
+            throw new XProcException(node, "Missing required attribute: class-name");
+        }
         entityResolver = value;
     }
 
     private void parseExtensionFunction(XdmNode node) {
         String value = node.getAttributeValue(_class_name);
+        if (value == null) {
+            throw new XProcException(node, "Missing required attribute: class-name");
+        }
         extensionFunctions.put(value, null);
     }
 
     private void parseFoProcessor(XdmNode node) {
         String value = node.getAttributeValue(_class_name);
+        if (value == null) {
+            throw new XProcException(node, "Missing required attribute: class-name");
+        }
         foProcessor = value;
     }
 
     private void parseCssProcessor(XdmNode node) {
         String value = node.getAttributeValue(_class_name);
+        if (value == null) {
+            throw new XProcException(node, "Missing required attribute: class-name");
+        }
         cssProcessor = value;
     }
 
     private void parseXProcConfigurer(XdmNode node) {
         String value = node.getAttributeValue(_class_name);
+        if (value == null) {
+            throw new XProcException(node, "Missing required attribute: class-name");
+        }
         xprocConfigurer = value;
     }
 
@@ -799,6 +1006,8 @@ public class XProcConfiguration {
             extensionValues = "true".equals(value);
         } else if ("xpointer-on-text".equals(name)) {
             xpointerOnText = "true".equals(value);
+        } else if ("ignore-invalid-xml-base".equals(name)) {
+            ignoreInvalidXmlBase = "true".equals(value);
         } else if ("transparent-json".equals(name)) {
             transparentJSON = "true".equals(value);
         } else if ("json-flavor".equals(name)) {
@@ -847,28 +1056,55 @@ public class XProcConfiguration {
         }
     }
 
+    private void parseProxy(XdmNode node) {
+        String host = node.getAttributeValue(new QName("", "host"));
+        String port = node.getAttributeValue(_port);
+        String scheme = node.getAttributeValue(new QName("", "scheme"));
+
+        if (scheme == null) {
+            scheme = "http";
+        }
+
+        if (host == null || port == null) {
+            throw new XProcException("Misconfigured proxy: missing host or port");
+        }
+
+        proxies.put(scheme, host + ":" + port);
+    }
+
     private void saxonConfigurationProperty(XdmNode node) {
         String value = node.getAttributeValue(_value);
         String key = node.getAttributeValue(_key);
         String type = node.getAttributeValue(_type);
-        Object valueObj = null;
         if (key == null || value == null) {
             throw new XProcException("Configuration option 'saxon-configuration-property' cannot have a null key or value");
         }
 
-        if ("boolean".equals(type)) {
-            valueObj = "true".equals(value);
-        } else if ("integer".equals(type)) {
-            valueObj = Integer.parseInt(value);
+        if (bFeatureMap.containsKey(key) || iFeatureMap.containsKey(key) || sFeatureMap.containsKey(key)) {
+            if (type.equals("boolean")) {
+                if (bFeatureMap.containsKey(key)) {
+                    Feature<Boolean> feature = bFeatureMap.get(key);
+                    cfgProcessor.setConfigurationProperty(feature, "true".equals(value));
+                } else {
+                    throw new XProcException("Saxon feature is not boolean: " + key);
+                }
+            } else if (type.equals("integer")) {
+                if (iFeatureMap.containsKey(key)) {
+                    Feature<Integer> feature = iFeatureMap.get(key);
+                    cfgProcessor.setConfigurationProperty(feature, Integer.parseInt(value));
+                } else {
+                    throw new XProcException("Saxon feature is not an integer: " + key);
+                }
+            } else {
+                if (sFeatureMap.containsKey(key)) {
+                    Feature<String> feature = sFeatureMap.get(key);
+                    cfgProcessor.setConfigurationProperty(feature, value);
+                } else {
+                    throw new XProcException("Saxon feature is not a string: " + key);
+                }
+            }
         } else {
-            valueObj = value;
-        }
-
-        try {
-            setSaxonProperties.add(key);
-            cfgProcessor.setConfigurationProperty(key, valueObj);
-        } catch (Exception e) {
-            throw new XProcException(e);
+            throw new XProcException("Unknown Saxon feature: " + key);
         }
     }
 
@@ -1098,7 +1334,12 @@ public class XProcConfiguration {
             QName name = new QName(tname,node);
             try {
                 Class<?> klass = Class.forName(value);
-                implementations.put(name, klass);
+                logger.debug("Found step type annotation: " + name.getClarkName());
+                if (implementations.containsKey(name)) {
+                    logger.debug("Ignoring step type annotation for configured step: " + name.getClarkName());
+                } else {
+                    implementations.put(name, klass);
+                }
             } catch (ClassNotFoundException e) {
                 logger.debug("Class not found: " + value);
             } catch (NoClassDefFoundError e) {
@@ -1213,7 +1454,7 @@ public class XProcConfiguration {
             return false;
         }
 
-        public XdmNode read() throws SaxonApiException {
+        public XdmNode read() {
             read = true;
 
             if (doc != null) {
@@ -1228,6 +1469,7 @@ public class XProcConfiguration {
                         node = (XdmNode) nodes.get(pos);
                     }
                 }
+                assert node != null;
 
                 XdmDestination dest = new XdmDestination();
                 try {
