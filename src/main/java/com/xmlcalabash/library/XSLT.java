@@ -29,6 +29,11 @@ import com.xmlcalabash.model.RuntimeValue;
 import com.xmlcalabash.runtime.XAtomicStep;
 import com.xmlcalabash.util.*;
 import net.sf.saxon.Configuration;
+import net.sf.saxon.Controller;
+import net.sf.saxon.event.ComplexContentOutputter;
+import net.sf.saxon.event.NamespaceReducer;
+import net.sf.saxon.event.PipelineConfiguration;
+import net.sf.saxon.event.Receiver;
 import net.sf.saxon.expr.instruct.TerminationException;
 import net.sf.saxon.lib.CollectionFinder;
 import net.sf.saxon.lib.ErrorReporter;
@@ -54,6 +59,7 @@ import net.sf.saxon.s9api.XdmItem;
 import net.sf.saxon.s9api.XdmNode;
 import net.sf.saxon.s9api.XdmValue;
 import net.sf.saxon.s9api.XmlProcessingError;
+import net.sf.saxon.trans.XPathException;
 import net.sf.saxon.s9api.XsltCompiler;
 import net.sf.saxon.s9api.XsltExecutable;
 import net.sf.saxon.s9api.XsltTransformer;
@@ -300,17 +306,35 @@ public class XSLT extends DefaultStep {
             // or a sequence of nodes, then make a document out of it. Otherwise, throw
             // an exception. Note: The RawDestination doesn't wrap nodes in a document,
             // so this is always necessary.
-            TreeWriter docout = new TreeWriter(runtime);
-            docout.startDocument(outputBaseURI != null ? outputBaseURI : document != null ? document.getBaseURI() : null);
-            for (XdmValue v : value) {
-                if (v instanceof XdmNode) {
-                    docout.addSubtree((XdmNode) v);
-                } else {
-                    throw new XProcException(step.getStep(), "p:xslt returned non-XML result");
-                }
-            }
 
-            xformed = docout.getResult();
+            try {
+                // not using TreeWriter in order to not override any base URIs
+                XdmDestination docout = new XdmDestination();
+                PipelineConfiguration pipe = new Controller(
+                    runtime.getProcessor().getUnderlyingConfiguration()).makePipelineConfiguration();
+                Receiver receiver = docout.getReceiver(
+                    pipe,
+                    runtime.getDefaultSerializationProperties());
+                receiver.setPipelineConfiguration(pipe);
+                receiver = new ComplexContentOutputter(new NamespaceReducer(receiver));
+                receiver.setSystemId(
+                    outputBaseURI != null
+                        ? outputBaseURI.toASCIIString()
+                        : document != null
+                            ? document.getBaseURI().toASCIIString()
+                            : "http://example.com/");
+                receiver.open();
+                receiver.startDocument(0);
+                for (XdmValue v : value)
+                    if (v instanceof XdmNode) {
+                        receiver.append(((XdmNode)v).getUnderlyingNode());
+                    } else {
+                        throw new XProcException(step.getStep(), "p:xslt returned non-XML result");
+                    }
+                xformed = docout.getXdmNode();
+            } catch (XPathException e) {
+                throw new RuntimeException(e);
+            }
         }
 
         // Is null when cx:serialize attribute was specified or when nothing is written to the
