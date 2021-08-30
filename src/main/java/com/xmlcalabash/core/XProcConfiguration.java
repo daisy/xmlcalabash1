@@ -41,6 +41,7 @@ import java.io.FileNotFoundException;
 import java.io.InputStreamReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -294,10 +295,10 @@ public class XProcConfiguration {
         }
     }
 
-    private Iterable<Class<?>> findClasses(Class<?> type) {
+    private Iterable<Class<?>> findClasses(Class<? extends Annotation> type) {
         Iterable<Class<?>> classes = null;
         try {
-            classes = ClassFilter.only().from(ClassIndex.getAnnotated(XMLCalabash.class));
+            classes = ClassFilter.only().from(ClassIndex.getAnnotated(type));
         } catch (NoClassDefFoundError e) {
             // org.atteo.classindex package does not exist
         }
