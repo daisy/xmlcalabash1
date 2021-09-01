@@ -301,11 +301,7 @@ public class XSLT extends DefaultStep {
             // an exception. Note: The RawDestination doesn't wrap nodes in a document,
             // so this is always necessary.
             TreeWriter docout = new TreeWriter(runtime);
-            if (document == null) {
-                docout.startDocument(null);
-            } else {
-                docout.startDocument(document.getBaseURI());
-            }
+            docout.startDocument(outputBaseURI != null ? outputBaseURI : document != null ? document.getBaseURI() : null);
             for (XdmValue v : value) {
                 if (v instanceof XdmNode) {
                     docout.addSubtree((XdmNode) v);
