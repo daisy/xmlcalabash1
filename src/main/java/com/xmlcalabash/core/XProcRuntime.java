@@ -61,6 +61,7 @@ import com.xmlcalabash.util.XProcSystemPropertySet;
 import com.xmlcalabash.util.XProcURIResolver;
 import com.xmlcalabash.util.XProcURIResolverX;
 import net.sf.saxon.Configuration;
+import net.sf.saxon.lib.ErrorReporter;
 import net.sf.saxon.lib.ExtensionFunctionDefinition;
 import net.sf.saxon.lib.FeatureKeys;
 import net.sf.saxon.om.AttributeMap;
@@ -72,6 +73,7 @@ import net.sf.saxon.s9api.SaxonApiException;
 import net.sf.saxon.s9api.Serializer;
 import net.sf.saxon.s9api.XdmDestination;
 import net.sf.saxon.s9api.XdmNode;
+import net.sf.saxon.s9api.XmlProcessingError;
 import net.sf.saxon.s9api.XsltCompiler;
 import net.sf.saxon.s9api.XsltExecutable;
 import net.sf.saxon.s9api.XsltTransformer;
@@ -248,9 +250,14 @@ public class XProcRuntime implements DeclarationScope {
             uriResolver.addCatalogs(config.catalogs);
         }
 
-        // FIXME: s10
+        // FIXME: make StepErrorListener work with saxon 10
         // StepErrorListener errListener = new StepErrorListener(this);
         // saxonConfig.setErrorListener(errListener);
+
+        // for now, to make messages not end up on stderr:
+        saxonConfig.setErrorReporterFactory(cfg -> new ErrorReporter() {
+                public void report(XmlProcessingError error) {}
+            });
 
         allowGeneralExpressions = config.extensionValues;
         allowXPointerOnText = config.xpointerOnText;
