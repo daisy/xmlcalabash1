@@ -159,7 +159,10 @@ public class LabelElements extends DefaultStep implements ProcessMatchingNodes {
         NamespaceMap nsmap = node.getUnderlyingNode().getAllNamespaces();
         AttributeMap amap = EmptyAttributeMap.getInstance();
 
-        String prefix = prefixFor(nsmap, attribute.getPrefix(), attribute.getNamespaceURI());
+        String prefix = attribute.getPrefix();
+        if (!"".equals(prefix)) {
+            prefix = prefixFor(nsmap, prefix, attribute.getNamespaceURI());
+        }
         NodeName aname = new FingerprintedQName(prefix, attribute.getNamespaceURI(), attribute.getLocalName());
 
         boolean found = false;
