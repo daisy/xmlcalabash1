@@ -29,6 +29,7 @@ import com.xmlcalabash.model.NamespaceBinding;
 import com.xmlcalabash.model.DeclareStep;
 import com.xmlcalabash.model.Option;
 import com.xmlcalabash.model.SequenceType;
+import com.xmlcalabash.util.TreeWriter;
 import com.xmlcalabash.util.XProcMessageListenerHelper;
 import net.sf.saxon.om.InscopeNamespaceResolver;
 import net.sf.saxon.om.NameChecker;
@@ -79,6 +80,8 @@ public class XAtomicStep extends XStep {
     public XAtomicStep(XProcRuntime runtime, Step step, XCompoundStep parent) {
         super(runtime, step);
         this.parent = parent;
+        if (parent != null)
+            this.parentLocation = parent.getLocation();
     }
 
     public XCompoundStep getParent() {
@@ -266,7 +269,7 @@ public class XAtomicStep extends XStep {
                             } else if (XProcConstants.c_param.equals(docelem.getNodeName())) {
                                 parseParameterNode(xstep,docelem);
                             } else {
-                                throw new XProcException(step.getNode(), docelem.getNodeName() + " found where c:param or c:param-set expected");
+                                throw new XProcException(step, docelem.getNodeName() + " found where c:param or c:param-set expected");
                             }
                         }
                     }
@@ -388,15 +391,22 @@ public class XAtomicStep extends XStep {
 
         runtime.start(this);
         try {
-            try {
-                XProcMessageListenerHelper.openStep(runtime, this);
-            } catch (Throwable e) {
-                throw handleException(e);
-            }
+            XProcMessageListenerHelper.openStep(runtime, this);
             try {
                 xstep.run();
-            } catch (Throwable e) {
-                throw handleException(e);
+            } catch (RuntimeException e) {
+                // If an unexpected exception happens while running a step, log the XProc stack
+                // trace in order to aid debugging. With "unexpected exception" we mean an exception
+                // that is not a XProcException or SaxonApiException: these are not allowed to
+                // happen (if they do it's due to a bug), and are not caught by p:try.
+                if (!(e instanceof XProcException)) {
+                    // creating XProcException only to get the nice XProc stack trace
+                    logger.error("An unexpected runtime exception happened: "
+                                 + XProcException.fromException(e)
+                                                 .rebase(getLocation(), new RuntimeException().getStackTrace())
+                                                 .toString());
+                }
+                throw e;
             } finally {
                 runtime.getMessageListener().closeStep();
             }
@@ -434,6 +444,14 @@ public class XAtomicStep extends XStep {
         parent.reportError(doc);
     }
 
+    public void reportError(XProcException exception) {
+        TreeWriter treeWriter = new TreeWriter(runtime);
+        treeWriter.startDocument(getNode().getBaseURI());
+        exception.serialize(treeWriter);
+        treeWriter.endDocument();
+        reportError(treeWriter.getResult());
+    }
+    
     private void parseParameterNode(XProcStep impl, XdmNode pnode) {
         String value = pnode.getAttributeValue(_value);
 
@@ -596,7 +614,8 @@ public class XAtomicStep extends XStep {
                 }
                 doc = pipe.read();
                 if (pipe.moreDocuments()) {
-                    throw XProcException.dynamicError(step, 8, "More than one document in context for parameter '" + var.getName() + "'");
+                    throw XProcException.dynamicError(
+                        8, this, "More than one document in context for parameter '" + var.getName() + "'");
                 }
             }
         } catch (SaxonApiException sae) {
@@ -900,7 +919,16 @@ public class XAtomicStep extends XStep {
                     if ("http://www.w3.org/2005/xqt-errors".equals(xe.getErrorCodeNamespace()) && "XPDY0002".equals(xe.getErrorCodeLocalPart())) {
                         throw XProcException.dynamicError(26, step.getNode(), "Expression refers to context when none is available: " + xpath);
                     } else {
-                        throw saue;
+                        Throwable cause = sae.getCause();
+                        if (cause != null)
+                            throw new XProcException(
+                                this,
+                                sae,
+                                XProcException.fromException(cause)
+                                              .rebase(null, new RuntimeException().getStackTrace())
+                                              .rebase(this));
+                        else
+                            throw saue;
                     }
 
                 } else {
@@ -911,8 +939,10 @@ public class XAtomicStep extends XStep {
             if (S9apiUtils.xpathSyntaxError(sae)) {
                 throw XProcException.dynamicError(23, step.getNode(), sae.getCause().getMessage());
             } else {
-                throw new XProcException(sae);
+                throw new XProcException(this, sae);
             }
+        } catch (SaxonApiUncheckedException saue) {
+            throw new XProcException(this, saue);
         }
 
         return results;

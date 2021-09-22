@@ -132,7 +132,16 @@ public class DeclareStep extends CompoundStep implements DeclarationScope {
     public DeclareStep getDeclaration(QName type) {
         DeclareStep decl = null;
         if (parentScope != null)
-            decl = parentScope.getDeclaration(type);
+            try {
+                decl = parentScope.getDeclaration(type);
+            } catch (XProcException e) {
+                if (XProcConstants.staticError(44).equals(e.getErrorCode())) {
+                    // step was not found
+                    // throw same exception but with more precise location info
+                    throw XProcException.staticError(44, node, "Unexpected step name: " + type);
+                } else
+                    throw e;
+            }
         for (PipelineLibrary lib : importedLibs) {
             DeclareStep d = lib.getDeclaration(type);
             if (d != null) {
@@ -221,10 +230,10 @@ public class DeclareStep extends CompoundStep implements DeclarationScope {
         for (Input input : decl.inputs()) {
             if (!input.getPort().startsWith("|") && input.getPrimary()) {
                 if (seenPrimaryDocument && !input.getParameterInput()) {
-                    error("At most one primary document input port is allowed", XProcConstants.staticError(30));
+                    error(XProcException.staticError(30, "At most one primary document input port is allowed"));
                 }
                 if (seenPrimaryParameter && input.getParameterInput()) {
-                    error("At most one primary parameter input port is allowed", XProcConstants.staticError(30));
+                    error(XProcException.staticError(30, "At most one primary parameter input port is allowed"));
                 }
 
                 if (input.getParameterInput()) {
@@ -239,7 +248,7 @@ public class DeclareStep extends CompoundStep implements DeclarationScope {
         for (Output output : decl.outputs()) {
             if (!output.getPort().endsWith("|") && output.getPrimary()) {
                 if (seenPrimary) {
-                    error("At most one primary output port is allowed", XProcConstants.staticError(30));
+                    error(XProcException.staticError(30, "At most one primary output port is allowed"));
                 }
                 seenPrimary = true;
             }
@@ -251,7 +260,7 @@ public class DeclareStep extends CompoundStep implements DeclarationScope {
         }
 
         if (subpipeline.size() == 0) {
-            error("Declared step has no subpipeline, but is not known.", XProcConstants.staticError(100)); // FIXME!
+            error(XProcException.staticError(100, "Declared step has no subpipeline, but is not known.")); // FIXME!
             return;
         }
 
@@ -363,7 +372,7 @@ public class DeclareStep extends CompoundStep implements DeclarationScope {
         while (outputIter.hasNext()) {
             Output output = outputIter.next();
             if (output.getPrimary()) {
-                error("Unbound primary output: " + output, new QName("", "ERR"));
+                error(new XProcException(new QName("", "ERR"), "Unbound primary output: " + output));
                 valid = false;
             }
         }
@@ -414,7 +423,9 @@ public class DeclareStep extends CompoundStep implements DeclarationScope {
                 port = substep.getDefaultOutput();
 
                 if (port == null) {
-                    error("Output port '" + input.getPort().substring(1) + "' on " + getStep() + " unbound", XProcConstants.staticError(5));
+                    error(
+                        XProcException.staticError(
+                            5, "Output port '" + input.getPort().substring(1) + "' on " + getStep() + " unbound"));
                     valid = false;
                 }
             }
@@ -475,7 +486,9 @@ public class DeclareStep extends CompoundStep implements DeclarationScope {
                 } else {
                     Output output = env.readablePort(pipe.getStep(), pipe.getPort());
                     if (output == null) {
-                        error("Unreadable port: " + pipe.getPort() + " on " + pipe.getStep(), XProcException.err_E0001);
+                        error(
+                            new XProcException(
+                                XProcException.err_E0001, "Unreadable port: " + pipe.getPort() + " on " + pipe.getStep()));
                         valid = false;
                     }
                 }

@@ -21,6 +21,8 @@ import net.sf.saxon.s9api.XdmNode;
 
 import java.util.*;
 
+import javax.xml.transform.SourceLocator;
+
 /**
  * Created by IntelliJ IDEA.
  * User: ndw
@@ -35,10 +37,17 @@ public class XPipeline extends XCompoundStep {
     private static final QName _namespace = new QName("namespace");
     private static final QName _value = new QName("value");
 
+    private Vector<XdmNode> errors = new Vector<XdmNode> ();
+
     private Hashtable<QName, RuntimeValue> optionsPassedIn = null;
 
     public XPipeline(XProcRuntime runtime, Step step, XCompoundStep parent) {
         super(runtime, step, parent);
+    }
+
+    public XPipeline(XProcRuntime runtime, Step step, XCompoundStep parent, SourceLocator[] callingLocation) {
+        super(runtime, step, parent);
+        this.parentLocation = callingLocation;
     }
 
     public DeclareStep getDeclareStep() {
@@ -232,11 +241,7 @@ public class XPipeline extends XCompoundStep {
         }
 
         for (XStep step : subpipeline) {
-            try {
-                step.run();
-            } catch (Throwable e) {
-                throw handleException(e);
-            }
+            step.run();
         }
 
         for (String port : inputs.keySet()) {
@@ -262,5 +267,19 @@ public class XPipeline extends XCompoundStep {
                 }
             }
         }
+    }
+
+    public void reportError(XdmNode doc) {
+        errors.add(doc);
+    }
+
+    public List<XdmNode> errors() {
+        return errors;
+    }
+
+    // don't include p:declare-step and p:pipeline in stack trace
+    @Override
+    public SourceLocator[] getLocation() {
+        return parentLocation;
     }
 }

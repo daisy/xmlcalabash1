@@ -6,6 +6,7 @@ import com.xmlcalabash.model.*;
 import com.xmlcalabash.util.XProcMessageListenerHelper;
 import net.sf.saxon.s9api.SaxonApiException;
 import net.sf.saxon.s9api.QName;
+import net.sf.saxon.s9api.XdmNode;
 
 import java.util.HashSet;
 
@@ -21,7 +22,6 @@ public class XPipelineCall extends XAtomicStep {
 
     public XPipelineCall(XProcRuntime runtime, Step step, XCompoundStep parent) {
         super(runtime, step, parent);
-        this.parent = parent;
     }
 
     public void setDeclaration(DeclareStep decl) {
@@ -38,12 +38,12 @@ public class XPipelineCall extends XAtomicStep {
 
         decl.setup();
 
-        if (runtime.getErrorCode() != null) {
-            throw new XProcException(runtime.getErrorCode(), runtime.getErrorMessage());
+        if (runtime.getError() != null) {
+            throw runtime.getError().copy();
         }
 
         XRootStep root = new XRootStep(runtime);
-        XPipeline newstep = new XPipeline(runtime, decl, root);
+        XPipeline newstep = new XPipeline(runtime, decl, root, getLocation());
 
         newstep.instantiate(decl);
 
@@ -92,16 +92,13 @@ public class XPipelineCall extends XAtomicStep {
         }
 
         runtime.start(this);
-        try {
-            XProcMessageListenerHelper.openStep(runtime, this);
-        } catch (Throwable e) {
-            throw handleException(e);
-        }
+        XProcMessageListenerHelper.openStep(runtime, this);
         try {
             newstep.run();
-        } catch (Throwable e) {
-            throw handleException(e);
         } finally {
+            for (XdmNode doc : newstep.errors()) {
+                reportError(doc);
+            }
             runtime.getMessageListener().closeStep();
         }
         runtime.finish(this);
