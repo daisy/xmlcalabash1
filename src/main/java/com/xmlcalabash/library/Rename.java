@@ -20,6 +20,7 @@
 package com.xmlcalabash.library;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Map;
 
 import com.xmlcalabash.core.XMLCalabash;
@@ -35,6 +36,7 @@ import net.sf.saxon.om.AttributeInfo;
 import net.sf.saxon.om.AttributeMap;
 import net.sf.saxon.om.FingerprintedQName;
 import net.sf.saxon.om.NamespaceMap;
+import net.sf.saxon.om.NodeName;
 import net.sf.saxon.s9api.QName;
 import net.sf.saxon.s9api.SaxonApiException;
 import net.sf.saxon.s9api.XdmNode;
@@ -126,9 +128,9 @@ public class Rename extends DefaultStep implements ProcessMatchingNodes {
 
     @Override
     public AttributeMap processAttributes(XdmNode node, AttributeMap matchingAttributes, AttributeMap nonMatchingAttributes) {
-        ArrayList<AttributeInfo> alist = new ArrayList<>();
+        Map<NodeName,AttributeInfo> alist = new HashMap<>();
         for (AttributeInfo attr : nonMatchingAttributes) {
-            alist.add(attr);
+            alist.put(attr.getNodeName(), attr);
         }
 
         if (matchingAttributes.size() > 1) {
@@ -146,7 +148,7 @@ public class Rename extends DefaultStep implements ProcessMatchingNodes {
             if (uri == null || "".equals(uri)) {
                 FingerprintedQName fqName = new FingerprintedQName("", "", localName);
                 AttributeInfo ainfo = new AttributeInfo(fqName, attr.getType(), attr.getValue(), attr.getLocation(), attr.getProperties());
-                alist.add(ainfo);
+                alist.put(ainfo.getNodeName(), ainfo);
             } else {
                 if (prefix == null || "".equals(prefix)) {
                     prefix = "_";
@@ -164,11 +166,11 @@ public class Rename extends DefaultStep implements ProcessMatchingNodes {
                 prefix = checkPrefix;
                 FingerprintedQName fqName = new FingerprintedQName(prefix, uri, localName);
                 AttributeInfo ainfo = new AttributeInfo(fqName, attr.getType(), attr.getValue(), attr.getLocation(), attr.getProperties());
-                alist.add(ainfo);
+                alist.put(ainfo.getNodeName(), ainfo);
             }
         }
 
-        return AttributeMap.fromList(alist);
+        return AttributeMap.fromList(new ArrayList<AttributeInfo>(alist.values()));
     }
 
     @Override
