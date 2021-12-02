@@ -187,7 +187,11 @@ public class XProcMessageListenerHelper {
 			while (variables.hasNext()) {
 				XPathVariable var = variables.next();
 				QName name = new QName(var.getVariableQName().toJaxpQName());
-				dynamicContext.setVariable(var, globals.get(name).getStringValue());
+				RuntimeValue val = globals.get(name);
+				dynamicContext.setVariable(var, (runtime.getAllowGeneralExpressions() && val.hasGeneralValue()
+				                                     ? val.getValue()
+				                                     : val.getUntypedAtomic(runtime)
+				                                 ).getUnderlyingValue());
 			}
 		}
 		expr.typeCheck(ExpressionVisitor.make(dummyContext),
