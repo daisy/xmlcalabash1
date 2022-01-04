@@ -111,7 +111,7 @@ public class XProcException extends RuntimeException {
      * @param cause    The XProc error that caused this XProc error to be created. Note that this
      *                 is not the same as the cause of the Java exception.
      */
-    private XProcException(QName code, Object location, Object message, XProcException cause) {
+    protected XProcException(QName code, Object location, Object message, XProcException cause) {
         super(
             message instanceof String
                 ? (String)message
@@ -245,6 +245,10 @@ public class XProcException extends RuntimeException {
 
     public XProcException(QName code, XStep location, Throwable message) {
         this(code, location, message, null);
+    }
+
+	public XProcException(QName code, XStep location, String message, XProcException cause) {
+        this(code, (Object)location, (Object)message, cause);
     }
 
     public XProcException(QName code, String message) {
