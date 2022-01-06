@@ -87,7 +87,7 @@ public class Replace extends DefaultStep implements ProcessMatchingNodes {
         result.write(matcher.getResult());
     }
 
-    public boolean processStartDocument(XdmNode node) {
+    public boolean processStartDocument(XdmNode node) throws SaxonApiException {
         doReplace();
         return false;
     }
@@ -102,7 +102,7 @@ public class Replace extends DefaultStep implements ProcessMatchingNodes {
     }
 
     @Override
-    public boolean processStartElement(XdmNode node, AttributeMap attributes) {
+    public boolean processStartElement(XdmNode node, AttributeMap attributes) throws SaxonApiException {
         doReplace();
         return false;
     }
@@ -111,19 +111,19 @@ public class Replace extends DefaultStep implements ProcessMatchingNodes {
         // nop
     }
 
-    public void processText(XdmNode node) {
+    public void processText(XdmNode node) throws SaxonApiException {
         doReplace();
     }
 
-    public void processComment(XdmNode node) {
+    public void processComment(XdmNode node) throws SaxonApiException {
         doReplace();
     }
 
-    public void processPI(XdmNode node) {
+    public void processPI(XdmNode node) throws SaxonApiException {
         doReplace();
     }
 
-    private void doReplace() {
+    private void doReplace() throws SaxonApiException {
         while (replacement.moreDocuments()) {
             matcher.addSubtree(replacement.read());
         }

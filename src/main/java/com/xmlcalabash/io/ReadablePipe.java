@@ -30,12 +30,11 @@ import com.xmlcalabash.model.Step;
 public interface ReadablePipe {
     public void canReadSequence(boolean sequence);
     public boolean readSequence();
-    public XdmNode read();
+    public XdmNode read() throws SaxonApiException;
     public void setReader(Step step);
     public void setNames(String stepName, String portName);
     public void resetReader();
-    public boolean moreDocuments();
-    public boolean closed();
-    public int documentCount();
-    public DocumentSequence documents();
+    public boolean moreDocuments() throws SaxonApiException;
+    public int documentCount() throws SaxonApiException;
+    public ReadableDocumentSequence documents();
 }

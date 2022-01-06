@@ -318,12 +318,17 @@ public class RunTestReport {
             for (String port : pipeoutputs.keySet()) {
                 if (compare.inputPorts.contains(port)) {
                     ReadablePipe pipe = pipeoutputs.get(port);
-                    while (pipe.moreDocuments()) {
-                        XdmNode p = pipe.read();
-                        if (!cinputs.containsKey(port)) {
-                            cinputs.put(port, new Vector<>());
+                    try {
+                        while (pipe.moreDocuments()) {
+                            XdmNode p = pipe.read();
+                            if (!cinputs.containsKey(port)) {
+                                cinputs.put(port, new Vector<>());
+                            }
+                            cinputs.get(port).add(p);
                         }
-                        cinputs.get(port).add(p);
+                    } catch (Exception err) {
+                        result.catchException(err);
+                        return result;
                     }
                 }
             }

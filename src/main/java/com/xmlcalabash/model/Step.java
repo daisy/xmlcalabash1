@@ -49,6 +49,7 @@ public class Step extends SourceArtifact {
     protected QName stepType = null;
     protected String stepName = null;
     private boolean anonymous = false;
+    private Boolean pure = null;
     protected Vector<Input> inputs = new Vector<Input> ();
     protected Vector<Output> outputs = new Vector<Output> ();
     private Vector<Option> options = new Vector<Option> ();
@@ -128,6 +129,13 @@ public class Step extends SourceArtifact {
 
     public boolean isAnonymous() {
         return anonymous;
+    }
+
+    public boolean isPure() {
+        if (pure == null) {
+            pure = Boolean.parseBoolean(getExtensionAttribute(XProcConstants.cx_pure));
+        }
+        return pure;
     }
 
     public void setDeclaration(DeclareStep decl) {

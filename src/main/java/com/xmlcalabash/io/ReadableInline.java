@@ -110,7 +110,7 @@ public class ReadableInline implements ReadablePipe {
         pos = 0;
     }
     
-    public boolean moreDocuments() {
+    public boolean moreDocuments() throws SaxonApiException {
         return pos < documents.size();
     }
 
@@ -118,11 +118,11 @@ public class ReadableInline implements ReadablePipe {
         return true;
     }
 
-    public int documentCount() {
+    public int documentCount() throws SaxonApiException {
         return documents.size();
     }
 
-    public DocumentSequence documents() {
+    public ReadableDocumentSequence documents() {
         return documents;
     }
 
@@ -134,7 +134,7 @@ public class ReadableInline implements ReadablePipe {
         // nop;
     }
 
-    public XdmNode read() {
+    public XdmNode read() throws SaxonApiException {
         XdmNode doc = documents.get(pos++);
 
         if (reader != null) {

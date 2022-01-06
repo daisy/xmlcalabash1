@@ -10,6 +10,7 @@ import java.util.Vector;
 import com.xmlcalabash.core.XMLCalabash;
 import net.sf.saxon.s9api.QName;
 import net.sf.saxon.s9api.SaxonApiException;
+import net.sf.saxon.s9api.XdmNode;
 
 import com.xmlcalabash.config.FoProcessor;
 import com.xmlcalabash.core.XProcConstants;
@@ -115,10 +116,11 @@ public class XSLFormatter extends DefaultStep {
         try {
             final FoProcessor processor = provider;
             DataStore store = runtime.getDataStore();
+            XdmNode s = source.read();
             URI id = store.writeEntry(href, base, contentType, new DataWriter() {
                 public void store(OutputStream content) throws IOException {
                     OutputStream out = new BufferedOutputStream(content);
-                    processor.format(source.read(),out,contentType);
+                    processor.format(s, out, contentType);
                     out.close();
                 }
             });

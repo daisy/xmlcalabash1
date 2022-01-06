@@ -5,6 +5,7 @@ import java.math.MathContext;
 
 import com.xmlcalabash.io.Pipe;
 import com.xmlcalabash.io.ReadablePipe;
+import com.xmlcalabash.io.ReadOnlyPipe;
 import com.xmlcalabash.io.WritablePipe;
 import com.xmlcalabash.core.XProcRuntime;
 import com.xmlcalabash.core.XProcException;
@@ -41,7 +42,7 @@ public class XViewport extends XCompoundStep implements ProcessMatchingNodes {
             if (current == null) {
                 current = new Pipe(runtime);
             }
-            return new Pipe(runtime,current.documents());
+            return new ReadOnlyPipe(runtime, current.documents());
         } else {
             return super.getBinding(stepName, portName);
         }
@@ -57,7 +58,7 @@ public class XViewport extends XCompoundStep implements ProcessMatchingNodes {
         sequencePosition = 0;
     }
 
-    public void run() throws SaxonApiException {
+    protected void doRun() throws SaxonApiException {
         logger.trace("Running p:viewport " + step.getName());
 
         XProcData data = runtime.getXProcData();
@@ -119,7 +120,7 @@ public class XViewport extends XCompoundStep implements ProcessMatchingNodes {
     }
 
     @Override
-    public boolean processStartElement(XdmNode node, AttributeMap attributes) {
+    public boolean processStartElement(XdmNode node, AttributeMap attributes) throws SaxonApiException {
         runtime.getMessageListener().openStep(this, getNode(), null, null, BigDecimal.ONE.divide(new BigDecimal(sequenceLength), MathContext.DECIMAL128));
         try {
         // Use a TreeWriter to make the matching node into a proper document

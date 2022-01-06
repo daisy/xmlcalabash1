@@ -116,9 +116,10 @@ public class CssFormatter extends DefaultStep {
 
         try {
             DataStore store = runtime.getDataStore();
+            XdmNode s = source.read();
             URI id = store.writeEntry(href, base, contentType, new DataWriter() {
                 public void store(OutputStream out) {
-                    provider.format(source.read(),out,contentType);
+                    provider.format(s, out, contentType);
                 }
             });
 

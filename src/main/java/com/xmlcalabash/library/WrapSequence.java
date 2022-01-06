@@ -104,7 +104,7 @@ public class WrapSequence extends DefaultStep {
         }
     }
 
-    private void runSimple() {
+    private void runSimple() throws SaxonApiException {
         TreeWriter treeWriter = new TreeWriter(runtime);
         treeWriter.startDocument(step.getNode().getBaseURI());
         treeWriter.addStartElement(wrapper);

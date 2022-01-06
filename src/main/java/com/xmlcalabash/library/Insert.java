@@ -97,7 +97,7 @@ public class Insert extends DefaultStep implements ProcessMatchingNodes {
     }
 
     @Override
-    public boolean processStartElement(XdmNode node, AttributeMap attributes) {
+    public boolean processStartElement(XdmNode node, AttributeMap attributes) throws SaxonApiException {
         if ("before".equals(position)) {
             doInsert();
         }
@@ -111,7 +111,7 @@ public class Insert extends DefaultStep implements ProcessMatchingNodes {
         return true;
     }
 
-    public void processEndElement(XdmNode node) {
+    public void processEndElement(XdmNode node) throws SaxonApiException {
         if ("last-child".equals(position)) {
             doInsert();
         }
@@ -123,19 +123,19 @@ public class Insert extends DefaultStep implements ProcessMatchingNodes {
         }
     }
 
-    public void processText(XdmNode node) {
+    public void processText(XdmNode node) throws SaxonApiException {
         process(node);
     }
 
-    public void processComment(XdmNode node)  {
+    public void processComment(XdmNode node) throws SaxonApiException {
         process(node);
     }
 
-    public void processPI(XdmNode node) {
+    public void processPI(XdmNode node) throws SaxonApiException {
         process(node);
     }
 
-    private void process(XdmNode node) {
+    private void process(XdmNode node) throws SaxonApiException {
         if ("before".equals(position)) {
             doInsert();
         }
@@ -159,7 +159,7 @@ public class Insert extends DefaultStep implements ProcessMatchingNodes {
         }
     }
 
-    private void doInsert() {
+    private void doInsert() throws SaxonApiException {
         while (insertion.moreDocuments()) {
             XdmNode doc = insertion.read();
             XdmSequenceIterator<XdmNode> iter = doc.axisIterator(Axis.CHILD);
