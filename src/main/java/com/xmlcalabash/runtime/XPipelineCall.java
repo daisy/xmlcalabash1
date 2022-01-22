@@ -28,10 +28,7 @@ public class XPipelineCall extends XAtomicStep {
 
     public XPipelineCall(XProcRuntime runtime, Step step, XCompoundStep parent) {
         super(runtime, step, parent);
-    }
-
-    public void setDeclaration(DeclareStep decl) {
-        this.decl = decl;
+        decl = step.getDeclaration();
     }
 
     public XCompoundStep getParent() {
