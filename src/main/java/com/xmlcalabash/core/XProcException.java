@@ -207,6 +207,10 @@ public class XProcException extends RuntimeException {
         return new DynamicXProcError(code, location, message, null);
     }
 
+    public static XProcException dynamicError(int code, Step location) {
+        return new DynamicXProcError(code, location, null, null);
+    }
+
     public static XProcException dynamicError(int code, Step location, String message) {
         return new DynamicXProcError(code, location, message, null);
     }
