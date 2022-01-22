@@ -7,6 +7,7 @@ import com.xmlcalabash.core.XProcRuntime;
 import com.xmlcalabash.core.XProcConfiguration;
 import com.xmlcalabash.core.XProcConstants;
 import net.sf.saxon.s9api.XdmNode;
+import net.sf.saxon.s9api.XdmNodeKind;
 import net.sf.saxon.s9api.Serializer;
 import net.sf.saxon.s9api.SaxonApiException;
 import net.sf.saxon.s9api.QName;
@@ -199,7 +200,9 @@ public class PipeLogger {
 
         switch (logstyle) {
             case WRAPPED:
-                stream.print("<px:document base-uri='" + document.getBaseURI() + "'>");
+                stream.print("<px:document base-uri='" + document.getBaseURI()
+                             + "' root-element-base-uri='" + document.children(n -> n.getNodeKind() == XdmNodeKind.ELEMENT).iterator().next().getBaseURI()
+                             + "'>");
                 try {
                     S9apiUtils.serialize(runtime, document, serializer);
                 } catch (SaxonApiException sae) {
