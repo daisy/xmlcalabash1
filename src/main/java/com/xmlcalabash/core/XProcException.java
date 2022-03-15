@@ -23,6 +23,7 @@ import com.xmlcalabash.model.Step;
 import com.xmlcalabash.runtime.XStep;
 import com.xmlcalabash.util.S9apiUtils;
 import com.xmlcalabash.util.TreeWriter;
+import com.xmlcalabash.util.TypeUtils;
 import com.xmlcalabash.util.URIUtils;
 
 import net.sf.saxon.expr.instruct.Actor;
@@ -33,16 +34,20 @@ import net.sf.saxon.expr.instruct.NamedTemplate;
 import net.sf.saxon.expr.instruct.TemplateRule;
 import net.sf.saxon.expr.instruct.TerminationException;
 import net.sf.saxon.expr.instruct.UserFunction;
-import net.sf.saxon.expr.parser.ExplicitLocation;
+import net.sf.saxon.expr.parser.Loc;
 import net.sf.saxon.expr.parser.XPathParser;
 import net.sf.saxon.expr.XPathContext;
 import net.sf.saxon.lib.NamespaceConstant;
 import net.sf.saxon.lib.StandardErrorListener;
+import net.sf.saxon.om.AttributeMap;
+import net.sf.saxon.om.EmptyAttributeMap;
 import net.sf.saxon.om.Item;
+import net.sf.saxon.om.NamespaceMap;
 import net.sf.saxon.om.NodeInfo;
 import net.sf.saxon.om.StructuredQName;
 import net.sf.saxon.s9api.QName;
 import net.sf.saxon.s9api.XdmNode;
+import net.sf.saxon.s9api.XmlProcessingError;
 import net.sf.saxon.trace.ContextStackFrame;
 import net.sf.saxon.trace.ContextStackIterator;
 import net.sf.saxon.trans.KeyDefinition;
@@ -101,7 +106,8 @@ public class XProcException extends RuntimeException {
      * @param code     The type of the error, or <code>null</code> if untyped.
      * @param location The location of the error, or <code>null</code> if unknown or not
      *                 applicable. Can be a {@link SourceLocator[]}, {@link XStep}, {@link Step},
-     *                 {@link XdmNode}, {@link TransformerException} or {@link Throwable}.
+     *                 {@link XdmNode}, {@link TransformerException}, {@link XmlProcessingError} or
+     *                 {@link Throwable}.
      * @param message  The content of the error. Can be a {@link String}, {@link XdmNode}, {@link
      *                 Throwable} or <code>null</code> if absent. In case of {@link Throwable}, this
      *                 argument determines both the content of the error (through its {@link
@@ -315,6 +321,10 @@ public class XProcException extends RuntimeException {
         this(null, location, message, null);
     }
 
+    public XProcException(XmlProcessingError location, String message) {
+        this(null, location, message, null);
+    }
+
     public XProcException(TransformerException location, XdmNode message, XProcException cause) {
         this(null, location, message, cause);
     }
@@ -475,6 +485,8 @@ public class XProcException extends RuntimeException {
                 location = ((XProcException)object).getLocation();
             else if (object instanceof TransformerException)
                 location = getLocation((TransformerException)object);
+            else if (object instanceof XmlProcessingError)
+                location = getLocation((XmlProcessingError)object);
             else if (object instanceof StackTraceElement[])
                 location = getLocation((StackTraceElement[])object);
             else if (object instanceof Throwable)
@@ -508,7 +520,7 @@ public class XProcException extends RuntimeException {
             }
         }
         if (loc == null)
-            loc = ExplicitLocation.UNKNOWN_LOCATION;
+            loc = Loc.NONE;
         if (loc instanceof XPathParser.NestedLocation)
             loc = ((XPathParser.NestedLocation)loc).getContainingLocation();
         String instructionName = getInstructionName(loc);
@@ -532,6 +544,17 @@ public class XProcException extends RuntimeException {
             }
         }
         return frames.toArray(new SourceLocator[frames.size()]);
+    }
+
+    private static SourceLocator[] getLocation(XmlProcessingError error) {
+        String instructionName = getInstructionName(error.getLocation());
+        SourceLocator loc = error.getLocation();
+        if (loc == null)
+            loc = Loc.NONE;
+        if (loc instanceof XPathParser.NestedLocation)
+            loc = ((XPathParser.NestedLocation)loc).getContainingLocation();
+        loc = prettyLocator(loc, instructionName);
+        return new SourceLocator[]{loc};
     }
 
     private static SourceLocator[] getLocation(StackTraceElement[] trace) {
@@ -579,7 +602,7 @@ public class XProcException extends RuntimeException {
         } else if (loc instanceof ValidationException && ((ValidationException)loc).getNode() != null) {
             return (((ValidationException)loc).getNode()).getDisplayName();
         } else if (loc instanceof Instruction) {
-            return StandardErrorListener.getInstructionName((Instruction)loc);
+            return StandardErrorListener.getInstructionNameDefault((Instruction)loc);
         } else if (loc instanceof Actor) {
             return getInstructionName((Actor)loc);
         } else {
@@ -613,7 +636,7 @@ public class XProcException extends RuntimeException {
     }
 
     private static String getInstructionName(Actor actor) {
-        StructuredQName name = actor.getObjectName();
+        StructuredQName name = actor.getComponentName();
         String objectName = name == null ? "" : name.getDisplayName();
         if (actor instanceof UserFunction) {
             return "function " + objectName + "()";
@@ -777,18 +800,18 @@ public class XProcException extends RuntimeException {
         }
         if (empty) return;
         writer.addStartElement(px_location);
-        writer.startContent();
         for (SourceLocator l : location) {
             if (l.getSystemId() != null || l.getLineNumber() > 0) {
-                writer.addStartElement(px_file);
+                AttributeMap attrs = EmptyAttributeMap.getInstance();
                 if (l.getSystemId() != null)
-                    writer.addAttribute(_href, l.getSystemId());
+                    attrs = attrs.put(TypeUtils.attributeInfo(_href, l.getSystemId()));
                 int line = l.getLineNumber();
                 if (line > 0)
-                    writer.addAttribute(_line, ""+line);
+                    attrs = attrs.put(TypeUtils.attributeInfo(_line, ""+line));
                 int column = l.getColumnNumber();
                 if (column > 0)
-                    writer.addAttribute(_column, ""+column);
+                    attrs = attrs.put(TypeUtils.attributeInfo(_column, ""+column));
+                writer.addStartElement(px_file, attrs);
                 writer.addEndElement();
             }
         }
@@ -796,26 +819,27 @@ public class XProcException extends RuntimeException {
     }
 
     public void serialize(TreeWriter writer) {
-        writer.addStartElement(c_error);
+        AttributeMap attrs = EmptyAttributeMap.getInstance();
+        NamespaceMap nsmap = NamespaceMap.emptyMap();
         if (errorCode != null) {
             StructuredQName qCode = new StructuredQName(errorCode.getPrefix(), errorCode.getNamespaceURI(), errorCode.getLocalName());
-            writer.addNamespace(qCode.getPrefix(), qCode.getNamespaceBinding().getURI());
-            writer.addAttribute(_code, qCode.getDisplayName());
+            nsmap = nsmap.put(qCode.getPrefix(), qCode.getNamespaceBinding().getURI());
+            attrs = attrs.put(TypeUtils.attributeInfo(_code, qCode.getDisplayName()));
         }
         if (location[0] instanceof XProcLocator) {
             Step step = ((XProcLocator)location[0]).step;
             if (step != null) {
-                writer.addAttribute(_name, step.getName());
-                writer.addAttribute(_type, step.getType().toString());
+                attrs = attrs.put(TypeUtils.attributeInfo(_name, step.getName()));
+                attrs = attrs.put(TypeUtils.attributeInfo(_type, step.getType().toString()));
             }
         }
         if (location[0].getSystemId() != null)
-            writer.addAttribute(_href, location[0].getSystemId());
+            attrs = attrs.put(TypeUtils.attributeInfo(_href, location[0].getSystemId()));
         if (location[0].getLineNumber() > 0)
-            writer.addAttribute(_line, ""+location[0].getLineNumber());
+            attrs = attrs.put(TypeUtils.attributeInfo(_line, ""+location[0].getLineNumber()));
         if (location[0].getColumnNumber() > 0)
-            writer.addAttribute(_column, ""+location[0].getColumnNumber());
-        writer.startContent();
+            attrs = attrs.put(TypeUtils.attributeInfo(_column, ""+location[0].getColumnNumber()));
+        writer.addStartElement(c_error, attrs, nsmap);
         if (errorContent != null)
             writer.addSubtree(errorContent);
         else {
@@ -826,7 +850,6 @@ public class XProcException extends RuntimeException {
         serializeLocation(location, writer);
         if (errorCause != null) {
             writer.addStartElement(px_cause);
-            writer.startContent();
             errorCause.serialize(writer);
             writer.addEndElement();
         }

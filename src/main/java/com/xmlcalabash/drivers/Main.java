@@ -178,6 +178,10 @@ public class Main {
 
         XPipeline pipeline = null;
 
+        if (runtime == null) {
+            runtime = new XProcRuntime(config);
+        }
+
         if (userArgs.getPipeline() != null) {
             pipeline = runtime.load(userArgs.getPipeline());
         } else if (userArgs.hasImplicitPipeline()) {
@@ -406,8 +410,7 @@ public class Main {
                     if ("omit-xml-declaration".equals(name)) serial.setOmitXMLDeclaration("true".equals(value));
                     if ("undeclare-prefixes".equals(name)) serial.setUndeclarePrefixes("true".equals(value));
                     if ("method".equals(name)) serial.setMethod(new QName("", value));
-
-                    // FIXME: if ("cdata-section-elements".equals(name)) serial.setCdataSectionElements();
+                    if ("cdata-section-elements".equals(name)) serial.setCdataSectionElements(value);
                     if ("doctype-public".equals(name)) serial.setDoctypePublic(value);
                     if ("doctype-system".equals(name)) serial.setDoctypeSystem(value);
                     if ("encoding".equals(name)) serial.setEncoding(value);
@@ -423,7 +426,7 @@ public class Main {
                     "byte-order-mark", "escape-uri-attributes", "include-content-type",
                     "indent", "omit-xml-declaration", "undeclare-prefixes", "method",
                     "doctype-public", "doctype-system", "encoding", "media-type",
-                    "normalization-form", "standalone", "version" }) {
+                    "normalization-form", "standalone", "version", "cdata-section-elements" }) {
                 String value = userArgs.getSerializationParameter(port, name);
                 if (value == null) {
                     value = userArgs.getSerializationParameter(name);
@@ -439,7 +442,7 @@ public class Main {
                 if ("omit-xml-declaration".equals(name)) serial.setOmitXMLDeclaration("true".equals(value));
                 if ("undeclare-prefixes".equals(name)) serial.setUndeclarePrefixes("true".equals(value));
                 if ("method".equals(name)) serial.setMethod(new QName("", value));
-                // N.B. cdata-section-elements isn't allowed
+                if ("cdata-section-elements".equals(name)) serial.setCdataSectionElements(value);
                 if ("doctype-public".equals(name)) serial.setDoctypePublic(value);
                 if ("doctype-system".equals(name)) serial.setDoctypeSystem(value);
                 if ("encoding".equals(name)) serial.setEncoding(value);

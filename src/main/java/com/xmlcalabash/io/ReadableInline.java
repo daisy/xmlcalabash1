@@ -22,9 +22,13 @@ package com.xmlcalabash.io;
 import java.net.URI;
 import java.util.Vector;
 import java.util.HashSet;
+import java.util.function.Function;
 
 import com.xmlcalabash.core.XProcConstants;
 import com.xmlcalabash.util.MessageFormatter;
+import net.sf.saxon.tree.wrapper.RebasedDocument;
+import net.sf.saxon.om.NodeInfo;
+import net.sf.saxon.om.TreeInfo;
 import net.sf.saxon.s9api.*;
 import com.xmlcalabash.util.S9apiUtils;
 import com.xmlcalabash.core.XProcRuntime;
@@ -81,8 +85,13 @@ public class ReadableInline implements ReadablePipe {
         try {
             S9apiUtils.writeXdmValue(runtime, nodes, dest, baseURI);
             XdmNode doc = dest.getXdmNode();
-
             doc = S9apiUtils.removeNamespaces(runtime, doc, excludeNS, true);
+
+            BaseURIMapper bmapper = new BaseURIMapper();
+            SystemIdMapper smapper = new SystemIdMapper();
+            TreeInfo tree = doc.getUnderlyingNode().getTreeInfo();
+            doc = new XdmNode(new RebasedDocument(tree, bmapper, smapper).wrap(doc.getUnderlyingNode()));
+
             documents.add(doc);
         } catch (SaxonApiException sae) {
             throw new XProcException(sae);
@@ -125,7 +134,7 @@ public class ReadableInline implements ReadablePipe {
         // nop;
     }
 
-    public XdmNode read() throws SaxonApiException {
+    public XdmNode read() {
         XdmNode doc = documents.get(pos++);
 
         if (reader != null) {
@@ -139,4 +148,21 @@ public class ReadableInline implements ReadablePipe {
     public String toString() {
         return "readableinline " + documents;
     }
+
+    private class BaseURIMapper implements Function<NodeInfo, String> {
+        @Override
+        public String apply(NodeInfo node) {
+            return node.getBaseURI();
+        }
+    }
+
+    private class SystemIdMapper implements Function<NodeInfo, String> {
+        // This is a nop for now
+        @Override
+        public String apply(NodeInfo node) {
+            return node.getSystemId();
+        }
+    }
+
+
 }

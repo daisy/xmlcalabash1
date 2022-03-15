@@ -34,9 +34,9 @@ import com.xmlcalabash.util.XProcCollectionFinder;
 import com.xmlcalabash.util.XProcMessageListenerHelper;
 import net.sf.saxon.Configuration;
 import net.sf.saxon.lib.CollectionFinder;
-import net.sf.saxon.om.InscopeNamespaceResolver;
 import net.sf.saxon.om.NameChecker;
 import net.sf.saxon.om.NamePool;
+import net.sf.saxon.om.NamespaceMap;
 import net.sf.saxon.om.NodeInfo;
 import net.sf.saxon.trans.XPathException;
 import net.sf.saxon.s9api.QName;
@@ -251,6 +251,7 @@ public class XAtomicStep extends XStep {
                             XdmNode node = source.read();
                             XdmNode docelem = S9apiUtils.getDocumentElement(node);
 
+                            assert docelem != null;
                             if (XProcConstants.c_param_set.equals(docelem.getNodeName())) {
                                 // Check the attributes...
                                 for (XdmNode attr : new AxisNodes(docelem, Axis.ATTRIBUTE)) {
@@ -545,7 +546,7 @@ public class XAtomicStep extends XStep {
             }
         }
 
-        String stringValue = "";
+        StringBuffer stringValue = new StringBuffer();
         Vector<XdmItem> items = new Vector<XdmItem> ();
         for (XdmNode child : new AxisNodes(runtime, pnode, Axis.CHILD, AxisNodes.PIPELINE)) {
             if (child.getNodeKind() == XdmNodeKind.ELEMENT) {
@@ -558,7 +559,7 @@ public class XAtomicStep extends XStep {
                     Vector<XdmValue> nodes = new Vector<XdmValue> ();
                     URI baseURI = null;
 
-                    XdmSequenceIterator iter = child.axisIterator(Axis.CHILD);
+                    XdmSequenceIterator<XdmNode> iter = child.axisIterator(Axis.CHILD);
                     while (iter.hasNext()) {
                         XdmNode gchild = (XdmNode) iter.next();
 
@@ -577,21 +578,19 @@ public class XAtomicStep extends XStep {
                         }
                         S9apiUtils.writeXdmValue(runtime.getProcessor(), nodes, dest, baseURI);
                         XdmNode doc = dest.getXdmNode();
-                        stringValue += doc.getStringValue();
+                        stringValue.append(doc.getStringValue());
                         items.add(doc);
-                    } catch (URISyntaxException use) {
+                    } catch (URISyntaxException | SaxonApiException use) {
                         throw new XProcException(use);
-                    } catch (SaxonApiException sae) {
-                        throw new XProcException(sae);
                     }
                 } else {
-                    stringValue += child.getStringValue();
+                    stringValue.append(child.getStringValue());
                     items.add(new XdmAtomicValue(child.getStringValue()));
                 }
             }
         }
 
-        RuntimeValue value = new RuntimeValue(stringValue, new XdmValue(items), pnode, new Hashtable<String,String> ());
+        RuntimeValue value = new RuntimeValue(stringValue.toString(), new XdmValue(items), pnode, new Hashtable<String,String> ());
 
         if (port != null) {
             impl.setParameter(port,pname,value);
@@ -609,46 +608,42 @@ public class XAtomicStep extends XStep {
             defaultCollection = new Vector<XdmNode>();
         }
 
-        try {
-            if (var.getBinding().size() > 0) {
-                Binding binding = var.getBinding().firstElement();
+        if (var.getBinding().size() > 0) {
+            Binding binding = var.getBinding().firstElement();
 
-                ReadablePipe pipe = null;
-                if (binding.getBindingType() == Binding.ERROR_BINDING) {
-                    XStep step = this;
-                    while (!(step instanceof XCatch)) {
-                        step = step.getParent();
-                    }
-                    pipe = ((XCatch)step).errorPipe;
-                } else {
-                    pipe = getPipeFromBinding(binding);
-                    pipe.canReadSequence(runtime.getAllowSequenceAsContext());
+            ReadablePipe pipe = null;
+            if (binding.getBindingType() == Binding.ERROR_BINDING) {
+                XStep step = this;
+                while (!(step instanceof XCatch)) {
+                    step = step.getParent();
                 }
-                if (pipe.readSequence()) {
-                    while (pipe.moreDocuments()) {
-                        if (defaultCollection != null) {
-                            if (doc == null) {
-                                doc = pipe.read();
-                                defaultCollection.add(doc);
-                            } else {
-                                defaultCollection.add(pipe.read());
-                            }
-                        } else if (doc == null) {
+                pipe = ((XCatch) step).errorPipe;
+            } else {
+                pipe = getPipeFromBinding(binding);
+                pipe.canReadSequence(runtime.getAllowSequenceAsContext());
+            }
+            if (pipe.readSequence()) {
+                while (pipe.moreDocuments()) {
+                    if (defaultCollection != null) {
+                        if (doc == null) {
                             doc = pipe.read();
+                            defaultCollection.add(doc);
                         } else {
-                            pipe.read();
+                            defaultCollection.add(pipe.read());
                         }
+                    } else if (doc == null) {
+                        doc = pipe.read();
+                    } else {
+                        pipe.read();
                     }
-                } else {
-                    doc = pipe.read();
-                    if (pipe.moreDocuments()) {
-                        throw XProcException.dynamicError(
-                            8, this, "More than one document in context for parameter '" + var.getName() + "'");
-                    }
+                }
+            } else {
+                doc = pipe.read();
+                if (pipe.moreDocuments()) {
+                    throw XProcException.dynamicError(
+                        8, this, "More than one document in context for parameter '" + var.getName() + "'");
                 }
             }
-        } catch (SaxonApiException sae) {
-            throw new XProcException(sae);
         }
 
         for (NamespaceBinding nsbinding : var.getNamespaceBindings()) {
@@ -673,21 +668,10 @@ public class XAtomicStep extends XStep {
                     }
 
                     // Make sure the namespace bindings for evaluating the XPath expr are correct
-                    // FIXME: Surely there's a better way to do this?
-                    Hashtable<String,String> lclnsBindings = new Hashtable<String, String>();
-                    NodeInfo inode = nsbinding.getNode().getUnderlyingNode();
-                    NamePool pool = inode.getConfiguration().getNamePool();
-                    InscopeNamespaceResolver inscopeNS = new InscopeNamespaceResolver(inode);
-                    Iterator<?> pfxiter = inscopeNS.iteratePrefixes();
-                    while (pfxiter.hasNext()) {
-                        String nspfx = (String)pfxiter.next();
-                        String nsuri = inscopeNS.getURIForPrefix(nspfx, "".equals(nspfx));
-                        lclnsBindings.put(nspfx, nsuri);
-                    }
-
-                    for (String prefix : lclnsBindings.keySet()) {
-                        xcomp.declareNamespace(prefix, lclnsBindings.get(prefix));
-                    }
+                    NamespaceMap nsmap = nsbinding.getNode().getUnderlyingNode().getAllNamespaces();
+                    nsmap.iteratePrefixes().forEachRemaining(prefix -> {
+                        xcomp.declareNamespace(prefix, nsmap.getURIForPrefix(prefix, "".equals(prefix)));
+                    });
 
                     XPathExecutable xexec = xcomp.compile(nsbinding.getXPath());
                     XPathSelector selector = xexec.load();

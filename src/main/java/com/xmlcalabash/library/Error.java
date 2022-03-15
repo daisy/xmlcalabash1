@@ -30,6 +30,8 @@ import net.sf.saxon.s9api.SaxonApiException;
 import net.sf.saxon.s9api.XdmNode;
 import com.xmlcalabash.runtime.XAtomicStep;
 
+import java.util.HashMap;
+
 /**
  *
  * @author ndw
@@ -102,7 +104,7 @@ public class Error extends DefaultStep {
         XProcException e = (doc == null) ?
             new XProcException(errorCode, step, errorCode.getLocalName()) :
             new XProcException(errorCode, step, doc);
-        
+
         step.reportError(e);
         throw e;
     }

@@ -28,70 +28,44 @@ import com.xmlcalabash.io.DataStore.DataReader;
 import com.xmlcalabash.io.ReadablePipe;
 import com.xmlcalabash.io.WritablePipe;
 import com.xmlcalabash.runtime.XAtomicStep;
-import com.xmlcalabash.util.AxisNodes;
-import com.xmlcalabash.util.Base64;
-import com.xmlcalabash.util.HttpUtils;
-import com.xmlcalabash.util.JSONtoXML;
-import com.xmlcalabash.util.MIMEReader;
-import com.xmlcalabash.util.S9apiUtils;
-import com.xmlcalabash.util.TreeWriter;
-import com.xmlcalabash.util.XMLtoJSON;
-import net.sf.saxon.s9api.Axis;
-import net.sf.saxon.s9api.QName;
-import net.sf.saxon.s9api.SaxonApiException;
-import net.sf.saxon.s9api.Serializer;
-import net.sf.saxon.s9api.XdmNode;
-import net.sf.saxon.s9api.XdmNodeKind;
-import net.sf.saxon.s9api.XdmSequenceIterator;
-import org.apache.http.Consts;
-import org.apache.http.Header;
-import org.apache.http.HeaderElement;
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpEntityEnclosingRequest;
-import org.apache.http.HttpHost;
-import org.apache.http.HttpResponse;
-import org.apache.http.NameValuePair;
+import com.xmlcalabash.util.*;
+import net.sf.saxon.om.AttributeMap;
+import net.sf.saxon.om.EmptyAttributeMap;
+import net.sf.saxon.om.SingletonAttributeMap;
+import net.sf.saxon.s9api.*;
+import org.apache.http.*;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.UsernamePasswordCredentials;
+import org.apache.http.client.AuthCache;
 import org.apache.http.client.CookieStore;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.config.AuthSchemes;
 import org.apache.http.client.config.CookieSpecs;
 import org.apache.http.client.config.RequestConfig;
-import org.apache.http.client.methods.HttpDelete;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpHead;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.client.methods.HttpPut;
-import org.apache.http.client.methods.HttpPatch;
-import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.client.methods.*;
+import org.apache.http.client.protocol.HttpClientContext;
 import org.apache.http.cookie.Cookie;
 import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
-import org.apache.http.impl.client.BasicCookieStore;
-import org.apache.http.impl.client.BasicCredentialsProvider;
-import org.apache.http.impl.client.HttpClientBuilder;
-import org.apache.http.impl.client.StandardHttpRequestRetryHandler;
+import org.apache.http.entity.mime.FormBodyPartBuilder;
+import org.apache.http.entity.mime.MultipartEntityBuilder;
+import org.apache.http.entity.mime.content.ByteArrayBody;
+import org.apache.http.entity.mime.content.StringBody;
+import org.apache.http.impl.auth.BasicScheme;
+import org.apache.http.impl.client.*;
 import org.apache.http.message.BasicHeader;
-import org.apache.http.protocol.BasicHttpContext;
-import org.apache.http.protocol.HttpContext;
 import org.apache.http.protocol.HttpCoreContext;
 import org.apache.http.util.EntityUtils;
 import org.json.JSONTokener;
 import org.xml.sax.InputSource;
 
 import javax.xml.XMLConstants;
-import java.io.BufferedReader;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.StringWriter;
-import java.io.UnsupportedEncodingException;
+import java.io.*;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Vector;
 
@@ -129,6 +103,7 @@ public class HttpRequest extends DefaultStep {
     private static final int bufSize = 912 * 8; // A multiple of 3, 4, and 75 for base64 line breaking
 
     private boolean detailed = false;
+    private boolean sendAuthorization = false;
     private URI requestURI = null;
     private Vector<Header> headers = new Vector<Header> ();
     private String overrideContentType = null;
@@ -164,16 +139,17 @@ public class HttpRequest extends DefaultStep {
 
         XdmNode requestDoc = source.read();
         XdmNode start = S9apiUtils.getDocumentElement(requestDoc);
+        assert start != null;
 
         if (!c_request.equals(start.getNodeName())) {
             throw XProcException.stepError(40);
         }
 
         // Check for valid attributes
-        XdmSequenceIterator iter = start.axisIterator(Axis.ATTRIBUTE);
+        XdmSequenceIterator<XdmNode> iter = start.axisIterator(Axis.ATTRIBUTE);
         boolean ok = true;
         while (iter.hasNext()) {
-            XdmNode attr = (XdmNode) iter.next();
+            XdmNode attr = iter.next();
             QName name = attr.getNodeName();
             if (_method.equals(name) || _href.equals(name) || _detailed.equals(name)
                     || _status_only.equals(name) || _username.equals(name) || _password.equals(name)
@@ -193,6 +169,7 @@ public class HttpRequest extends DefaultStep {
         boolean statusOnly = "true".equals(start.getAttributeValue(_status_only));
         String method = start.getAttributeValue(_method);
         detailed = "true".equals(start.getAttributeValue(_detailed));
+        sendAuthorization = "true".equals(start.getAttributeValue(_send_authorization));
         overrideContentType = start.getAttributeValue(_override_content_type);
 
         if (method == null) {
@@ -218,7 +195,7 @@ public class HttpRequest extends DefaultStep {
         RequestConfig.Builder rqbuilder = RequestConfig.custom();
         rqbuilder.setCookieSpec(CookieSpecs.DEFAULT);
 
-        HttpContext localContext = new BasicHttpContext();
+        HttpClientContext localContext = HttpClientContext.create();
 
         // What about cookies
         String saveCookieKey = step.getExtensionAttribute(cx_save_cookies);
@@ -257,9 +234,25 @@ public class HttpRequest extends DefaultStep {
             String pass = start.getAttributeValue(_password);
             String meth = start.getAttributeValue(_auth_method);
 
+            String host = requestURI.getHost();
+            int port = requestURI.getPort();
+            AuthScope scope = new AuthScope(host,port); // Or this? new AuthScope(null, AuthScope.ANY_PORT)
+            BasicCredentialsProvider bCredsProvider = new BasicCredentialsProvider();
+            bCredsProvider.setCredentials(scope, new UsernamePasswordCredentials(user, pass));
+
             List<String> authpref;
             if ("basic".equalsIgnoreCase(meth)) {
                 authpref = Collections.singletonList(AuthSchemes.BASIC);
+
+                if (sendAuthorization) {
+                    // See https://stackoverflow.com/questions/20914311/httpclientbuilder-basic-auth
+                    AuthCache authCache = new BasicAuthCache();
+                    BasicScheme basicAuth = new BasicScheme();
+                    authCache.put(new HttpHost(host, port), basicAuth);
+
+                    localContext.setCredentialsProvider(bCredsProvider);
+                    localContext.setAuthCache(authCache);
+                }
             } else if ("digest".equalsIgnoreCase(meth)) {
                 authpref = Collections.singletonList(AuthSchemes.DIGEST);
             } else {
@@ -267,14 +260,6 @@ public class HttpRequest extends DefaultStep {
             }
 
             rqbuilder.setProxyPreferredAuthSchemes(authpref);
-
-            String host = requestURI.getHost();
-            int port = requestURI.getPort();
-            AuthScope scope = new AuthScope(host,port);
-            // Or this? new AuthScope(null, AuthScope.ANY_PORT)
-
-            BasicCredentialsProvider bCredsProvider = new BasicCredentialsProvider();
-            bCredsProvider.setCredentials(scope, new UsernamePasswordCredentials(user, pass));
             builder.setDefaultCredentialsProvider(bCredsProvider);
         }
 
@@ -308,36 +293,56 @@ public class HttpRequest extends DefaultStep {
             }
         }
 
-        String lcMethod = method.toLowerCase();
+        String lcMethod = method.toUpperCase();
 
-        // You can only have a body on PUT or POST or PATCH
-        if (body != null && !("put".equals(lcMethod) || "post".equals(lcMethod) || "patch".equals(lcMethod))) {
+        // You cannot have a body on HEAD or GET
+        if (body != null && ("HEAD".equals(lcMethod) || "GET".equals(lcMethod))) {
             throw XProcException.stepError(5);
         }
 
         HttpUriRequest httpRequest;
         HttpResponse httpResult = null;
-        if ("get".equals(lcMethod)) {
-            httpRequest = doGet();
-        } else if ("post".equals(lcMethod)) {
-            httpRequest = doPost(body);
-        } else if ("put".equals(lcMethod)) {
-            httpRequest = doPut(body);
-        } else if ("patch".equals(lcMethod)) {
-            httpRequest = doPatch(body);
-        } else if ("head".equals(lcMethod)) {
-            httpRequest = doHead();
-        } else if ("delete".equals(lcMethod)) {
-            httpRequest = doDelete();
-        } else {
-            throw new UnsupportedOperationException("Unrecognized http method: " + method);
-        }
+        switch (lcMethod) {
+            case "GET":
+                httpRequest = doGet();
+                break;
+            case "POST":
+                httpRequest = doPost(body);
+                break;
+            case "PUT":
+                httpRequest = doPut(body);
+                break;
+            case "PATCH":
+                httpRequest = doPatch(body);
+                break;
+            case "HEAD":
+                httpRequest = doHead();
+                break;
+            case "DELETE":
+                httpRequest = doDelete();
+                break;
+            default:
+                if (body != null) {
+                    httpRequest = doGenericMethodWithBody(lcMethod, body);
+                } else {
+                    httpRequest = doGenericMethod(lcMethod);
+                }        }
 
         TreeWriter tree = new TreeWriter(runtime);
 
         try {
             // Execute the method.
             builder.setRetryHandler(new StandardHttpRequestRetryHandler(3, false));
+
+            for (String pscheme : runtime.getConfiguration().proxies.keySet()) {
+                String proxy = runtime.getConfiguration().proxies.get(pscheme);
+                int pos = proxy.indexOf(":");
+                String host = proxy.substring(0, pos);
+                int port = Integer.parseInt(proxy.substring(pos+1));
+                HttpHost httpProxy = new HttpHost(host, port, pscheme);
+                builder.setProxy(httpProxy);
+            }
+
             HttpClient httpClient = builder.build();
             if (httpClient == null) {
                 throw new XProcException("HTTP requests have been disabled");
@@ -371,9 +376,7 @@ public class HttpRequest extends DefaultStep {
             }
 
             if (detailed) {
-                tree.addStartElement(XProcConstants.c_response);
-                tree.addAttribute(_status, "" + statusCode);
-                tree.startContent();
+                tree.addStartElement(XProcConstants.c_response, SingletonAttributeMap.of(TypeUtils.attributeInfo(_status, ""+statusCode)));
 
                 for (Header header : httpResult.getAllHeaders()) {
                     // I don't understand why/how HeaderElement parsing works. I get very weird results.
@@ -382,11 +385,11 @@ public class HttpRequest extends DefaultStep {
                     int cp = h.indexOf(":");
                     String name = header.getName();
                     String value = h.substring(cp+1).trim();
+                    AttributeMap attr = EmptyAttributeMap.getInstance();
 
-                    tree.addStartElement(XProcConstants.c_header);
-                    tree.addAttribute(_name, name);
-                    tree.addAttribute(_value, value);
-                    tree.startContent();
+                    attr = attr.put(TypeUtils.attributeInfo(_name, name));
+                    attr = attr.put(TypeUtils.attributeInfo(_value, value));
+                    tree.addStartElement(XProcConstants.c_header, attr);
                     tree.addEndElement();
                 }
 
@@ -430,6 +433,22 @@ public class HttpRequest extends DefaultStep {
         XdmNode resultNode = tree.getResult();
 
         result.write(resultNode);
+    }
+
+    private HttpGenericMethod doGenericMethod(String methodName) {
+        HttpGenericMethod method = new HttpGenericMethod(methodName, requestURI);
+
+        for (Header header : headers) {
+            method.addHeader(header);
+        }
+
+        return method;
+    }
+
+    private HttpGenericMethodWithBody doGenericMethodWithBody(String methodName, XdmNode body) {
+        HttpGenericMethodWithBody method = new HttpGenericMethodWithBody(methodName, requestURI);
+        doPutOrPost(method,body);
+        return method;
     }
 
     private HttpGet doGet() {
@@ -607,9 +626,9 @@ public class HttpRequest extends DefaultStep {
                     }
 
                     Vector<XdmNode> content = new Vector<XdmNode> ();
-                    XdmSequenceIterator iter = body.axisIterator(Axis.CHILD);
+                    XdmSequenceIterator<XdmNode> iter = body.axisIterator(Axis.CHILD);
                     while (iter.hasNext()) {
-                        XdmNode node = (XdmNode) iter.next();
+                        XdmNode node = iter.next();
                         content.add(node);
                     }
 
@@ -626,19 +645,14 @@ public class HttpRequest extends DefaultStep {
 
             method.setEntity(requestEntity);
 
-        } catch (IOException ioe) {
+        } catch (IOException | SaxonApiException ioe) {
             throw new XProcException(ioe);
-        } catch (SaxonApiException sae) {
-            throw new XProcException(sae);
         }
     }
 
-    private void doPutOrPostMultipart(HttpEntityEnclosingRequest method, XdmNode multipart) {
-        // The Apache HTTP libraries just don't handle this case...we treat it as a "single part"
-        // and build the body ourselves, using the boundaries etc.
-
+    private void doPutOrPostMultipart(HttpEntityEnclosingRequest method, XdmNode document) {
         // Check for consistency of content-type
-        String contentType = multipart.getAttributeValue(_content_type);
+        String contentType = document.getAttributeValue(_content_type);
         if (contentType == null) {
             contentType = "multipart/mixed";
         }
@@ -655,8 +669,7 @@ public class HttpRequest extends DefaultStep {
             method.addHeader(header);
         }
 
-        String boundary = multipart.getAttributeValue(_boundary);
-
+        String boundary = document.getAttributeValue(_boundary);
         if (boundary == null) {
             throw new XProcException(step, "A boundary value must be specified on c:multipart");
         }
@@ -665,21 +678,12 @@ public class HttpRequest extends DefaultStep {
             throw XProcException.stepError(2);
         }
 
-        String q = "\"";
-        if (boundary.contains(q)) {
-            q = "'";
-        }
-        if (boundary.contains(q)) {
-            q = "";
-        }
+        MultipartEntityBuilder entityBuilder = MultipartEntityBuilder.create();
+        entityBuilder.setBoundary(boundary);
+        entityBuilder.setContentType(ContentType.create(contentType));
+        int partCount = 0;
 
-        String multipartContentType = contentType + "; boundary=" + q + boundary + q;
-
-        // FIXME: This sucks rocks. I want to write the data to be posted, not provide some way to read it
-        MessageBytes byteContent = new MessageBytes();
-        byteContent.append("This is a multipart message.\r\n");
-        //String postContent = "This is a multipart message.\r\n";
-        for (XdmNode body : new AxisNodes(multipart, Axis.CHILD, AxisNodes.SIGNIFICANT)) {
+        for (XdmNode body : new AxisNodes(document, Axis.CHILD, AxisNodes.SIGNIFICANT)) {
             if (!XProcConstants.c_body.equals(body.getNodeName())) {
                 throw new XProcException(step, "A c:multipart may only contain c:body elements.");
             }
@@ -689,11 +693,10 @@ public class HttpRequest extends DefaultStep {
                 throw new XProcException(step, "Content-type on c:body is required.");
             }
 
+            partCount++;
             String bodyId = body.getAttributeValue(_id);
             String bodyDescription = body.getAttributeValue(_description);
             String bodyDisposition = body.getAttributeValue(_disposition);
-
-            String bodyCharset = HttpUtils.getCharset(bodyContentType);
 
             if (bodyContentType.contains(";")) {
                 int pos = bodyContentType.indexOf(";");
@@ -705,37 +708,38 @@ public class HttpRequest extends DefaultStep {
                 throw new UnsupportedOperationException("The '" + bodyEncoding + "' encoding is not supported");
             }
 
-            if (bodyCharset != null) {
-                bodyContentType += "; charset=" + bodyCharset;
+            String bodyCharset = HttpUtils.getCharset(bodyContentType);
+            if (bodyCharset == null) {
+                bodyCharset = "UTF-8";
             }
 
-            byteContent.append("--" + boundary + "\r\n");
-            byteContent.append("Content-Type: " + bodyContentType + "\r\n");
+            FormBodyPartBuilder part = FormBodyPartBuilder.create();
+            ContentType partCT = ContentType.create(bodyContentType, bodyCharset);
 
+            part.setName("part" + partCount);
             if (bodyDescription != null) {
-                byteContent.append("Content-Description: " + bodyDescription + "\r\n");
+                part = part.addField("Content-Description", bodyDescription);
             }
             if (bodyId != null) {
-                byteContent.append("Content-ID: " + bodyId + "\r\n");
+                part = part.addField("Content-Id", bodyId);
             }
             if (bodyDisposition != null) {
-                byteContent.append("Content-Disposition: " + bodyDisposition + "\r\n");
+                part = part.addField("Content-Disposition", bodyDisposition);
             }
             if (bodyEncoding != null) {
                 if (encodeBinary) {
-                    byteContent.append("Content-Transfer-Encoding: " + bodyEncoding + "\r\n");
+                    part = part.addField("Content-Tranfer-Encoding", bodyEncoding);
                 }
             }
-            byteContent.append("\r\n");
 
             try {
                 if (xmlContentType(bodyContentType)) {
                     Serializer serializer = makeSerializer();
 
-                    Vector<XdmNode> content = new Vector<XdmNode> ();
-                    XdmSequenceIterator iter = body.axisIterator(Axis.CHILD);
+                    Vector<XdmNode> content = new Vector<> ();
+                    XdmSequenceIterator<XdmNode> iter = body.axisIterator(Axis.CHILD);
                     while (iter.hasNext()) {
-                        XdmNode node = (XdmNode) iter.next();
+                        XdmNode node = iter.next();
                         content.add(node);
                     }
 
@@ -744,31 +748,26 @@ public class HttpRequest extends DefaultStep {
                     serializer.setOutputWriter(writer);
                     S9apiUtils.serialize(runtime, content, serializer);
                     writer.close();
-                    byteContent.append(writer.toString());
+
+                    part = part.setBody(new StringBody(writer.toString(), partCT));
+                    entityBuilder = entityBuilder.addPart(part.build());
                 } else if (jsonContentType(contentType)) {
-                    byteContent.append(XMLtoJSON.convert(body));
+                    part.setBody(new StringBody(XMLtoJSON.convert(body), partCT));
+                    entityBuilder = entityBuilder.addPart(part.build());
                 } else if (!encodeBinary && "base64".equals(bodyEncoding)) {
                     byte[] decoded = Base64.decode(body.getStringValue());
-                    byteContent.append(decoded, decoded.length);
+                    part.setBody(new ByteArrayBody(decoded, partCT, "fred"));
+                    entityBuilder = entityBuilder.addPart(part.build());
                 } else {
-                    byteContent.append(extractText(body));
+                    part.setBody(new StringBody(extractText(body), partCT));
+                    entityBuilder = entityBuilder.addPart(part.build());
                 }
-
-                //postContent += "\r\n";
-                byteContent.append("\r\n");
-            } catch (IOException ioe) {
+            } catch (IOException | SaxonApiException ioe) {
                 throw new XProcException(ioe);
-            } catch (SaxonApiException sae) {
-                throw new XProcException(sae);
             }
         }
 
-        //postContent += "--" + boundary + "--\r\n";
-        byteContent.append("--" + boundary + "--\r\n");
-
-        ByteArrayEntity requestEntity = new ByteArrayEntity(byteContent.content(), ContentType.create(multipartContentType));
-        //StringRequestEntity requestEntity = new StringRequestEntity(postContent, multipartContentType, null);
-        method.setEntity(requestEntity);
+        method.setEntity(entityBuilder.build());
     }
 
     private String getFullContentType(HttpResponse method) {
@@ -788,15 +787,15 @@ public class HttpRequest extends DefaultStep {
             return null;
         }
 
-        String ctype = contentTypes[0].getName();
+        StringBuilder ctype = new StringBuilder(contentTypes[0].getName());
         NameValuePair[] params = contentTypes[0].getParameters();
         if (params != null) {
             for (NameValuePair pair : params) {
-                ctype = ctype + "; " + pair.getName() + "=\"" + pair.getValue() + "\"";
+                ctype.append(";").append(pair.getName()).append("=\"").append(pair.getValue()).append("\"");
             }
         }
 
-        return ctype;
+        return ctype.toString();
     }
 
     private String getHeaderValue(Header header) {
@@ -893,11 +892,11 @@ public class HttpRequest extends DefaultStep {
         }
 
         if (contentType.startsWith("multipart/")) {
-            tree.addStartElement(XProcConstants.c_multipart);
-            tree.addAttribute(_content_type, contentType);
-            tree.addAttribute(_boundary, boundary);
-            tree.startContent();
-            
+            AttributeMap attr = EmptyAttributeMap.getInstance();
+            attr = attr.put(TypeUtils.attributeInfo(_content_type, contentType));
+            attr = attr.put(TypeUtils.attributeInfo(_boundary, boundary));
+            tree.addStartElement(XProcConstants.c_multipart, attr);
+
             readMultipartContent(tree, bodyStream, boundary);
 
             tree.addEndElement();
@@ -905,12 +904,13 @@ public class HttpRequest extends DefaultStep {
             if (!detailed && (xmlContentType(contentType) || jsonContentType(contentType))) {
                 readBodyContentPart(tree, bodyStream, contentType, charset);
             } else {
-                tree.addStartElement(XProcConstants.c_body);
-                tree.addAttribute(_content_type, contentType);
+                AttributeMap attr = EmptyAttributeMap.getInstance();
+                attr = attr.put(TypeUtils.attributeInfo(_content_type, contentType));
                 if (!xmlContentType(contentType) && !textContentType(contentType) && !jsonContentType(contentType)) {
-                    tree.addAttribute(_encoding, "base64");
+                    attr = attr.put(TypeUtils.attributeInfo(_encoding, "base64"));
                 }
-                tree.startContent();
+
+                tree.addStartElement(XProcConstants.c_body, attr);
                 readBodyContentPart(tree, bodyStream, contentType, charset);
                 tree.addEndElement();
             }
@@ -937,12 +937,13 @@ public class HttpRequest extends DefaultStep {
                 partStream = reader.readBodyPart();
             }
 
-            tree.addStartElement(XProcConstants.c_body);
-            tree.addAttribute(_content_type, contentType);
+            AttributeMap attr = EmptyAttributeMap.getInstance();
+            attr = attr.put(TypeUtils.attributeInfo(_content_type, contentType));
             if (!xmlContentType(contentType) && !textContentType(contentType)) {
-                tree.addAttribute(_encoding, "base64");
+                attr = attr.put(TypeUtils.attributeInfo(_encoding, "base64"));
             }
-            tree.startContent();
+
+            tree.addStartElement(XProcConstants.c_body, attr);
 
             if (xmlContentType(partType)) {
                 BufferedReader preader = new BufferedReader(new InputStreamReader(partStream, charset));
@@ -951,14 +952,14 @@ public class HttpRequest extends DefaultStep {
             } else if (textContentType(partType)) {
                 BufferedReader preader = new BufferedReader(new InputStreamReader(partStream, charset));
                 // Read it as text
-                char buf[] = new char[bufSize];
+                char[] buf = new char[bufSize];
                 int len = preader.read(buf, 0, bufSize);
                 while (len >= 0) {
                     // I'm unsure about this. If I'm reading text and injecting it into XML,
                     // I think I need to change CR/LF pairs (and CR not followed by LF) into
                     // plain LFs.
 
-                    char fbuf[] = new char[bufSize];
+                    char[] fbuf = new char[bufSize];
                     char flen = 0;
                     for (int pos = 0; pos < len; pos++) {
                         if (buf[pos] == '\r') {
@@ -982,7 +983,7 @@ public class HttpRequest extends DefaultStep {
                 }
             } else {
                 // Read it as binary
-                byte bytes[] = new byte[bufSize];
+                byte[] bytes = new byte[bufSize];
                 int pos = 0;
                 int readLen = bufSize;
                 int len = partStream.read(bytes, 0, bufSize);
@@ -999,7 +1000,7 @@ public class HttpRequest extends DefaultStep {
                 }
 
                 if (pos > 0) {
-                    byte lastBytes[] = new byte[pos];
+                    byte[] lastBytes = new byte[pos];
                     System.arraycopy(bytes, 0, lastBytes, 0, pos);
                     tree.addText(Base64.encodeBytes(lastBytes));
                 }
@@ -1020,7 +1021,7 @@ public class HttpRequest extends DefaultStep {
 
             InputStreamReader reader = new InputStreamReader(bodyStream, charset);
 
-            char buf[] = new char[bufSize];
+            char[] buf = new char[bufSize];
             int len = reader.read(buf, 0, bufSize);
             while (len >= 0) {
                 String s = new String(buf,0,len);
@@ -1034,7 +1035,7 @@ public class HttpRequest extends DefaultStep {
             tree.addSubtree(jsonDoc);
         } else {
             // Read it as binary
-            byte bytes[] = new byte[bufSize];
+            byte[] bytes = new byte[bufSize];
             int pos = 0;
             int readLen = bufSize;
             int len = bodyStream.read(bytes, 0, bufSize);
@@ -1052,7 +1053,7 @@ public class HttpRequest extends DefaultStep {
             }
 
             if (pos > 0) {
-                byte lastBytes[] = new byte[pos];
+                byte[] lastBytes = new byte[pos];
                 System.arraycopy(bytes, 0, lastBytes, 0, pos);
                 tree.addText(Base64.encodeBytes(lastBytes));
             }
@@ -1062,18 +1063,18 @@ public class HttpRequest extends DefaultStep {
     }
 
     private String extractText(XdmNode doc) {
-        String content = "";
+        StringBuilder content = new StringBuilder();
 
-        XdmSequenceIterator iter = doc.axisIterator(Axis.CHILD);
+        XdmSequenceIterator<XdmNode> iter = doc.axisIterator(Axis.CHILD);
         while (iter.hasNext()) {
-            XdmNode child = (XdmNode) iter.next();
+            XdmNode child = iter.next();
             if (child.getNodeKind() != XdmNodeKind.TEXT) {
                 throw XProcException.stepError(28);
             }
-            content += child.getStringValue();
+            content.append(child.getStringValue());
         }
 
-        return content;
+        return content.toString();
     }
 
     private void doFile(String href, String base) {
@@ -1094,12 +1095,13 @@ public class HttpRequest extends DefaultStep {
                         if (xmlContentType(contentType)) {
                             readBodyContentPart(tree, bodyStream, contentType, charset);
                         } else {
-                            tree.addStartElement(XProcConstants.c_body);
-                            tree.addAttribute(_content_type, contentType);
+                            AttributeMap attr = EmptyAttributeMap.getInstance();
+                            attr = attr.put(TypeUtils.attributeInfo(_content_type, contentType));
                             if (!xmlContentType(contentType) && !textContentType(contentType)) {
-                                tree.addAttribute(_encoding, "base64");
+                                attr = attr.put(TypeUtils.attributeInfo(_encoding, "base64"));
                             }
-                            tree.startContent();
+
+                            tree.addStartElement(XProcConstants.c_body, attr);
                             readBodyContentPart(tree, bodyStream, contentType, charset);
                             tree.addEndElement();
                         }
@@ -1113,45 +1115,34 @@ public class HttpRequest extends DefaultStep {
                     }
                 }
             });
-        } catch (FileNotFoundException fnfe) {
+        } catch (IOException fnfe) {
             throw new XProcException(fnfe);
-        } catch (IOException ioe) {
-            throw new XProcException(ioe);
         }
     }
 
-    private class MessageBytes {
-        int chunkSize = 8192;
-        byte[] byteContent = new byte[chunkSize];
-        int pos = 0;
-
-        public MessageBytes() {
+    private class HttpGenericMethod extends HttpEntityEnclosingRequestBase {
+        private String method;
+        public HttpGenericMethod(String method, URI requestURI) {
+            super();
+            this.method = method;
+            setURI(requestURI);
         }
-
-        public void append(String string) {
-            try {
-                byte[] bytes = string.getBytes("US-ASCII");
-                append(bytes, bytes.length);
-            } catch (UnsupportedEncodingException uee) {
-                // This never happens!
-                throw new XProcException(uee);
-            }
+        @Override
+        public String getMethod() {
+            return method;
         }
+    }
 
-        public void append(byte[] bytes, int size) {
-            if (pos + bytes.length > byteContent.length) {
-                byte[] newBytes = new byte[byteContent.length + bytes.length + chunkSize];
-                System.arraycopy(byteContent, 0, newBytes, 0, byteContent.length);
-                byteContent = newBytes;
-            }
-            System.arraycopy(bytes, 0, byteContent, pos, bytes.length);
-            pos += bytes.length;
+    private class HttpGenericMethodWithBody extends HttpEntityEnclosingRequestBase {
+        private String method;
+        public HttpGenericMethodWithBody(String method, URI requestURI) {
+            super();
+            this.method = method;
+            setURI(requestURI);
         }
-
-        public byte[] content() {
-            byte[] bytes = new byte[pos];
-            System.arraycopy(byteContent, 0, bytes, 0, pos);
-            return bytes;
+        @Override
+        public String getMethod() {
+            return method;
         }
     }
 }

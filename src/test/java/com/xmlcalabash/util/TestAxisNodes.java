@@ -40,36 +40,36 @@ public class TestAxisNodes {
         AxisNodes an = new AxisNodes(root, Axis.CHILD, AxisNodes.ALL);
 
         XdmNode n = an.iterator().next();
-        assertEquals(n.getNodeKind(), XdmNodeKind.PROCESSING_INSTRUCTION);
+        assertEquals(XdmNodeKind.PROCESSING_INSTRUCTION, n.getNodeKind());
 
         n = an.iterator().next();
-        assertEquals(n.getNodeKind(), XdmNodeKind.ELEMENT);
-        assertEquals(n.getNodeName(), new QName("", "p"));
+        assertEquals(XdmNodeKind.ELEMENT, n.getNodeKind());
+        assertEquals(new QName("", "p"), n.getNodeName());
 
         n = an.iterator().next();
-        assertEquals(n.getNodeKind(), XdmNodeKind.TEXT);
-        assertEquals(n.toString(), " ");
+        assertEquals(XdmNodeKind.TEXT, n.getNodeKind());
+        assertEquals(" ", n.getStringValue());
 
         n = an.iterator().next();
-        assertEquals(n.getNodeKind(), XdmNodeKind.ELEMENT);
-        assertEquals(n.getNodeName(), new QName("", "p"));
+        assertEquals(XdmNodeKind.ELEMENT, n.getNodeKind());
+        assertEquals(new QName("", "p"), n.getNodeName());
 
         n = an.iterator().next();
-        assertEquals(n.getNodeKind(), XdmNodeKind.TEXT);
-        assertEquals(n.toString(), " some text ");
+        assertEquals(XdmNodeKind.TEXT, n.getNodeKind());
+        assertEquals(" some text ", n.getStringValue());
 
         n = an.iterator().next();
-        assertEquals(n.getNodeKind(), XdmNodeKind.ELEMENT);
-        assertEquals(n.getNodeName(), new QName("", "p"));
+        assertEquals(XdmNodeKind.ELEMENT, n.getNodeKind());
+        assertEquals(new QName("", "p"), n.getNodeName());
 
         n = an.iterator().next();
-        assertEquals(n.getNodeKind(), XdmNodeKind.COMMENT);
+        assertEquals(XdmNodeKind.COMMENT, n.getNodeKind());
 
         n = an.iterator().next();
-        assertEquals(n.getNodeKind(), XdmNodeKind.ELEMENT);
-        assertEquals(n.getNodeName(), new QName("http://www.w3.org/ns/xproc", "documentation"));
+        assertEquals(XdmNodeKind.ELEMENT, n.getNodeKind());
+        assertEquals(new QName("http://www.w3.org/ns/xproc", "documentation"), n.getNodeName());
 
-        assertEquals(an.iterator().hasNext(), false);
+        assertEquals(false, an.iterator().hasNext());
     }
 
     @Test
@@ -77,26 +77,26 @@ public class TestAxisNodes {
         AxisNodes an = new AxisNodes(root, Axis.CHILD, AxisNodes.SIGNIFICANT);
 
         XdmNode n = an.iterator().next();
-        assertEquals(n.getNodeKind(), XdmNodeKind.ELEMENT);
-        assertEquals(n.getNodeName(), new QName("", "p"));
+        assertEquals(XdmNodeKind.ELEMENT, n.getNodeKind());
+        assertEquals(new QName("", "p"), n.getNodeName());
 
         n = an.iterator().next();
-        assertEquals(n.getNodeKind(), XdmNodeKind.ELEMENT);
-        assertEquals(n.getNodeName(), new QName("", "p"));
+        assertEquals(XdmNodeKind.ELEMENT, n.getNodeKind());
+        assertEquals(new QName("", "p"), n.getNodeName());
 
         n = an.iterator().next();
-        assertEquals(n.getNodeKind(), XdmNodeKind.TEXT);
-        assertEquals(n.toString(), " some text ");
+        assertEquals(XdmNodeKind.TEXT, n.getNodeKind());
+        assertEquals(" some text ", n.getStringValue());
 
         n = an.iterator().next();
-        assertEquals(n.getNodeKind(), XdmNodeKind.ELEMENT);
-        assertEquals(n.getNodeName(), new QName("", "p"));
+        assertEquals(XdmNodeKind.ELEMENT, n.getNodeKind());
+        assertEquals(new QName("", "p"), n.getNodeName());
 
         n = an.iterator().next();
-        assertEquals(n.getNodeKind(), XdmNodeKind.ELEMENT);
-        assertEquals(n.getNodeName(), new QName("http://www.w3.org/ns/xproc", "documentation"));
+        assertEquals(XdmNodeKind.ELEMENT, n.getNodeKind());
+        assertEquals(new QName("http://www.w3.org/ns/xproc", "documentation"), n.getNodeName());
 
-        assertEquals(an.iterator().hasNext(), false);
+        assertEquals(false, an.iterator().hasNext());
     }
 
     @Test
@@ -104,21 +104,21 @@ public class TestAxisNodes {
         AxisNodes an = new AxisNodes(null, root, Axis.CHILD, AxisNodes.PIPELINE);
 
         XdmNode n = an.iterator().next();
-        assertEquals(n.getNodeKind(), XdmNodeKind.ELEMENT);
-        assertEquals(n.getNodeName(), new QName("", "p"));
+        assertEquals(XdmNodeKind.ELEMENT, n.getNodeKind());
+        assertEquals(new QName("", "p"), n.getNodeName());
 
         n = an.iterator().next();
-        assertEquals(n.getNodeKind(), XdmNodeKind.ELEMENT);
-        assertEquals(n.getNodeName(), new QName("", "p"));
+        assertEquals(XdmNodeKind.ELEMENT, n.getNodeKind());
+        assertEquals(new QName("", "p"), n.getNodeName());
 
         n = an.iterator().next();
-        assertEquals(n.getNodeKind(), XdmNodeKind.TEXT);
-        assertEquals(n.toString(), " some text ");
+        assertEquals(XdmNodeKind.TEXT, n.getNodeKind());
+        assertEquals(" some text ", n.getStringValue());
 
         n = an.iterator().next();
-        assertEquals(n.getNodeKind(), XdmNodeKind.ELEMENT);
-        assertEquals(n.getNodeName(), new QName("", "p"));
+        assertEquals(XdmNodeKind.ELEMENT, n.getNodeKind());
+        assertEquals(new QName("", "p"), n.getNodeName());
 
-        assertEquals(an.iterator().hasNext(), false);
+        assertEquals(false, an.iterator().hasNext());
     }
 }

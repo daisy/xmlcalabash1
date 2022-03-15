@@ -2,11 +2,14 @@ package com.xmlcalabash.extensions;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.MalformedURLException;
 import java.net.URI;
 import java.util.Properties;
 
 import com.xmlcalabash.core.XMLCalabash;
+import com.xmlcalabash.util.TypeUtils;
+import net.sf.saxon.om.AttributeMap;
+import net.sf.saxon.om.EmptyAttributeMap;
+import net.sf.saxon.om.SingletonAttributeMap;
 import net.sf.saxon.s9api.QName;
 import net.sf.saxon.s9api.SaxonApiException;
 
@@ -84,29 +87,24 @@ public class JavaProperties extends DefaultStep {
                         properties.load(stream);
                     }
                 });
-            } catch (MalformedURLException mue) {
-                throw new XProcException(
-                    XProcException.err_E0001,
-                    new RuntimeException("XProc error err:" + XProcException.err_E0001.getLocalName(), mue));
             } catch (IOException ioe) {
                 throw new XProcException(
                     XProcException.err_E0001,
-                    new RuntimeException("XProc error err:" + XProcException.err_E0001.getLocalName(),ioe));
+                    new RuntimeException("XProc error err:" + XProcException.err_E0001.getLocalName(), ioe));
             }
         }
 
         TreeWriter tree = new TreeWriter(runtime);
         tree.startDocument(step.getNode().getBaseURI());
         tree.addStartElement(c_param_set);
-        tree.startContent();
 
         for (String name : properties.stringPropertyNames()) {
             String value = properties.getProperty(name);
-            tree.addStartElement(c_param);
-            tree.addAttribute(_name, name);
-            tree.addAttribute(_namespace, "");
-            tree.addAttribute(_value, value);
-            tree.startContent();
+            AttributeMap amap = EmptyAttributeMap.getInstance();
+            amap = amap.put(TypeUtils.attributeInfo(_name, name));
+            amap = amap.put(TypeUtils.attributeInfo(_namespace, ""));
+            amap = amap.put(TypeUtils.attributeInfo(_value, value));
+            tree.addStartElement(c_param, amap);
             tree.addEndElement();
         }
 

@@ -590,6 +590,15 @@ public class Parser {
         String sequence = node.getAttributeValue(new QName("sequence"));
         String select = node.getAttributeValue(new QName("select"));
 
+        if (!XProcConstants.p_declare_step.equals(parent.node.getNodeName())) {
+            if (kind != null) {
+                throw XProcException.staticError(8, node, "The 'kind' attribute is only allowed on an input declaration");
+            }
+            if (sequence != null) {
+                throw XProcException.staticError(8, node, "The 'sequence' attribute is only allowed on an input declaration");
+            }
+        }
+
         if (port == null && XProcConstants.p_input.equals(node.getNodeName())) {
             throw XProcException.staticError(38, node, "You must specify a port name for all p:input ports.");
         }
@@ -848,15 +857,9 @@ public class Parser {
             parent = parent.parent;
         }
 
-        if (parent instanceof DeclareStep) {
-            HashSet<String> excluded = ((DeclareStep) parent).getExcludeInlineNamespaces();
-            if (excluded != null) {
-                for (String uri : excluded) {
-                    excludeURIs.add(uri);
-                }
-            }
-        } else {
-            throw new UnsupportedOperationException("This can't happen: parent of inline is not a step!?");
+        HashSet<String> excluded = ((DeclareStep) parent).getExcludeInlineNamespaces();
+        if (excluded != null) {
+            excludeURIs.addAll(excluded);
         }
 
         checkExtensionAttributes(node, inline);
@@ -1080,7 +1083,13 @@ public class Parser {
 
         value = node.getAttributeValue(new QName("cdata-section-elements"));
         if (value != null) {
-            throw new UnsupportedOperationException("cdata-section-elements not yet supported");
+            StringBuilder sb = new StringBuilder();
+            for (String qname : value.split("\\s+")) {
+                QName name = new QName(qname, node);
+                sb.append(name.getClarkName());
+                sb.append(" ");
+            }
+            serial.setCdataSectionElements(sb.toString());
         }
 
         value = node.getAttributeValue(new QName("doctype-public"));

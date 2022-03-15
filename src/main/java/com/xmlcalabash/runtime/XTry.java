@@ -8,11 +8,11 @@ import com.xmlcalabash.util.TreeWriter;
 import com.xmlcalabash.util.XProcMessageListenerHelper;
 import com.xmlcalabash.io.WritablePipe;
 import com.xmlcalabash.model.*;
-import net.sf.saxon.om.StructuredQName;
 import net.sf.saxon.s9api.SaxonApiException;
 import net.sf.saxon.s9api.XdmNode;
 import net.sf.saxon.s9api.QName;
 
+import java.util.ArrayList;
 import java.util.Vector;
 
 /**
@@ -73,7 +73,6 @@ public class XTry extends XCompoundStep {
     }
 
     public void run() throws SaxonApiException {
-
         inScopeOptions = parent.getInScopeOptions();
         for (Variable var : step.getVariables()) {
             RuntimeValue value = computeValue(var);
@@ -105,7 +104,6 @@ public class XTry extends XCompoundStep {
             TreeWriter treeWriter = new TreeWriter(runtime);
             treeWriter.startDocument(step.getNode().getBaseURI());
             treeWriter.addStartElement(c_errors);
-            treeWriter.startContent();
 
             boolean reported = false;
             for (XdmNode doc : runtime.getXProcData().errors()) {

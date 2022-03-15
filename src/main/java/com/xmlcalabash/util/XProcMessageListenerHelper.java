@@ -24,9 +24,11 @@ import com.xmlcalabash.util.URIUtils;
 import net.sf.saxon.s9api.*;
 import net.sf.saxon.Configuration;
 import net.sf.saxon.expr.Expression;
-import net.sf.saxon.expr.parser.ExpressionVisitor;
 import net.sf.saxon.expr.parser.ContextItemStaticInfo;
+import net.sf.saxon.expr.parser.OptimizerOptions;
+import net.sf.saxon.expr.parser.ExpressionVisitor;
 import net.sf.saxon.functions.FunctionLibraryList;
+import net.sf.saxon.lib.NamespaceConstant;
 import net.sf.saxon.om.NameOfNode;
 import net.sf.saxon.om.NodeInfo;
 import net.sf.saxon.om.StructuredQName;
@@ -117,13 +119,13 @@ public class XProcMessageListenerHelper {
 	}
 
 	public static String evaluateAVT(String avt, final XProcRuntime runtime, final Hashtable<QName,RuntimeValue> globals) throws XPathException {
-		final XPathEvaluator evaluator = new XPathEvaluator(); {
+		final Configuration config = runtime.getProcessor().getUnderlyingConfiguration();
+		final XPathEvaluator evaluator = new XPathEvaluator(config); {
 			((IndependentContext)evaluator.getStaticContext()).setAllowUndeclaredVariables(true);
 		}
 
 		// AVT is a XSLT-only concept, we need to hack around that
 		ExpressionContext dummyContext; {
-			final Configuration config = runtime.getProcessor().getUnderlyingConfiguration();
 			final StylesheetPackage pack = config.makeStylesheetPackage();
 			pack.createFunctionLibrary();
 			final StyleElement dummyXslt = new StyleElement() {
@@ -138,7 +140,15 @@ public class XProcMessageListenerHelper {
 					}
 					initialise(NameOfNode.makeName(dummyNode), dummyNode.getSchemaType(), null, dummyNode, 0);
 				}
-				protected void prepareAttributes() throws XPathException {}
+				protected void prepareAttributes() {}
+				@Override
+				public Configuration getConfiguration() {
+					return config;
+				}
+				@Override
+				public String getDefaultXPathNamespace() {
+					return NamespaceConstant.NULL;
+				}
 			};
 			dummyContext = new ExpressionContext(dummyXslt, null) {
 				@Override
@@ -152,6 +162,10 @@ public class XProcMessageListenerHelper {
 				@Override
 				public DecimalFormatManager getDecimalFormatManager() {
 					return null;
+				}
+				@Override
+				public OptimizerOptions getOptimizerOptions() {
+					return config.getOptimizerOptions();
 				}
 				@Override
 				public Expression bindVariable(StructuredQName name) throws XPathException {

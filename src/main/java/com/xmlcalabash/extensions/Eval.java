@@ -17,6 +17,8 @@ import com.xmlcalabash.model.DeclareStep;
 import com.xmlcalabash.util.AxisNodes;
 import com.xmlcalabash.util.S9apiUtils;
 import com.xmlcalabash.util.TreeWriter;
+import com.xmlcalabash.util.TypeUtils;
+import net.sf.saxon.om.SingletonAttributeMap;
 import net.sf.saxon.s9api.QName;
 import net.sf.saxon.s9api.SaxonApiException;
 import net.sf.saxon.s9api.XdmNode;
@@ -25,6 +27,7 @@ import net.sf.saxon.s9api.XdmNodeKind;
 import net.sf.saxon.s9api.XdmSequenceIterator;
 import net.sf.saxon.s9api.Axis;
 import net.sf.saxon.s9api.XdmValue;
+import net.sf.saxon.tree.iter.SingleAtomicIterator;
 
 import java.util.Hashtable;
 import java.util.Vector;
@@ -107,6 +110,7 @@ public class Eval extends DefaultStep {
 
         XdmNode pipedoc = pipeline.read();
         XdmNode piperoot = S9apiUtils.getDocumentElement(pipedoc);
+        assert piperoot != null;
 
         XProcRuntime innerRuntime = new XProcRuntime(runtime);
         XPipeline pipeline = null;
@@ -127,6 +131,7 @@ public class Eval extends DefaultStep {
                     pipeline = library.getPipeline(stepName);
                 }
             }
+            assert pipeline != null;
 
             Set<String> inputports = pipeline.getInputs();
             Set<String> outputports = pipeline.getOutputs();
@@ -165,15 +170,16 @@ public class Eval extends DefaultStep {
                     String port = primaryin;
                     XdmNode doc = pipe.read();
                     XdmNode root = S9apiUtils.getDocumentElement(doc);
+                    assert root != null;
                     if (detailed && cx_document.equals(root.getNodeName())) {
                         port = root.getAttributeValue(_port);
                         // FIXME: support exclude-inline-prefixes
                         boolean seenelem = false;
                         XdmDestination dest = new XdmDestination();
                         Vector<XdmValue> nodes = new Vector<XdmValue>();
-                        XdmSequenceIterator iter = root.axisIterator(Axis.CHILD);
+                        XdmSequenceIterator<XdmNode> iter = root.axisIterator(Axis.CHILD);
                         while (iter.hasNext()) {
-                            XdmNode child = (XdmNode) iter.next();
+                            XdmNode child = iter.next();
                             if (child.getNodeKind() == XdmNodeKind.ELEMENT) {
                                 if (seenelem) {
                                     throw new IllegalArgumentException("Not a well-formed inline document");
@@ -220,6 +226,7 @@ public class Eval extends DefaultStep {
                 while (pipe.moreDocuments()) {
                     XdmNode doc = pipe.read();
                     XdmNode root = S9apiUtils.getDocumentElement(doc);
+                    assert root != null;
 
                     if (!cx_options.equals(root.getNodeName())) {
                         throw new XProcException(step, "Options port must be a cx:options document.");
@@ -261,9 +268,7 @@ public class Eval extends DefaultStep {
                     tree.startDocument(doc.getBaseURI());
 
                     if (detailed) {
-                        tree.addStartElement(cx_document);
-                        tree.addAttribute(_port, port);
-                        tree.startContent();
+                        tree.addStartElement(cx_document, SingletonAttributeMap.of(TypeUtils.attributeInfo(_port, port)));
                         tree.addSubtree(doc);
                         tree.addEndElement();
                     } else {

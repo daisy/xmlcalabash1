@@ -30,7 +30,7 @@ public class DocumentSequenceIterator implements FocusIterator, LastPositionFind
         this.last = last;
     }
 
-    public Item next() throws XPathException {
+    public Item next() {
         throw new UnsupportedOperationException("Don't know what to do for next() on DocumentSequenceIterator");
     }
 
@@ -46,16 +46,8 @@ public class DocumentSequenceIterator implements FocusIterator, LastPositionFind
         // ???
     }
 
-    public FocusIterator getAnother() throws XPathException {
-        throw new UnsupportedOperationException("Don't know what to do for getAnother() on DocumentSequenceIterator");
-    }
-
-    public int getProperties() {
-        return SequenceIterator.LAST_POSITION_FINDER;
-    }
-
     @Override
-    public int getLength() throws XPathException {
+    public int getLength() {
         return last;
     }
 }

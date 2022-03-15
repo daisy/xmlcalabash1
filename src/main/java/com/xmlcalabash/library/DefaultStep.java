@@ -1,24 +1,35 @@
 package com.xmlcalabash.library;
 
-import com.xmlcalabash.io.ReadablePipe;
-import com.xmlcalabash.io.WritablePipe;
+import com.xmlcalabash.core.XProcConstants;
 import com.xmlcalabash.core.XProcException;
 import com.xmlcalabash.core.XProcRuntime;
 import com.xmlcalabash.core.XProcStep;
-import com.xmlcalabash.core.XProcConstants;
+import com.xmlcalabash.io.ReadablePipe;
+import com.xmlcalabash.io.WritablePipe;
 import com.xmlcalabash.model.RuntimeValue;
-import net.sf.saxon.s9api.*;
+import com.xmlcalabash.runtime.XAtomicStep;
+import com.xmlcalabash.util.S9apiUtils;
+import net.sf.saxon.lib.NamespaceConstant;
+import net.sf.saxon.om.NamespaceBinding;
+import net.sf.saxon.om.NamespaceMap;
+import net.sf.saxon.s9api.QName;
+import net.sf.saxon.s9api.SaxonApiException;
+import net.sf.saxon.s9api.SaxonApiUncheckedException;
+import net.sf.saxon.s9api.Serializer;
+import net.sf.saxon.s9api.XPathCompiler;
+import net.sf.saxon.s9api.XPathExecutable;
+import net.sf.saxon.s9api.XPathSelector;
+import net.sf.saxon.s9api.XdmAtomicValue;
+import net.sf.saxon.s9api.XdmItem;
+import net.sf.saxon.s9api.XdmNode;
 import net.sf.saxon.trans.XPathException;
-
-import java.net.URI;
-import java.util.Hashtable;
-import java.util.Vector;
-import java.util.Iterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.xmlcalabash.runtime.XAtomicStep;
-import com.xmlcalabash.util.S9apiUtils;
+import java.net.URI;
+import java.util.Hashtable;
+import java.util.Iterator;
+import java.util.Vector;
 
 /**
  * Created by IntelliJ IDEA.
@@ -170,6 +181,44 @@ public class DefaultStep implements XProcStep {
         if (msg != null) {
             System.err.println("Message: " + msg);
         }
+    }
+
+    protected String prefixFor(NamespaceMap nsmap, String preferredPrefix, String uri) {
+        if (preferredPrefix == null) {
+            return prefixFor(nsmap, uri);
+        }
+
+        if (NamespaceConstant.XML.equals(uri)) {
+            return "xml";
+        }
+
+        String curMapping = nsmap.getURI(preferredPrefix);
+        if (curMapping == null || uri.equals(curMapping)) {
+            return preferredPrefix;
+        } else {
+            return prefixFor(nsmap, uri);
+        }
+    }
+
+    protected String prefixFor(NamespaceMap nsmap, String uri) {
+        if (NamespaceConstant.XML.equals(uri)) {
+            return "xml";
+        }
+
+        int count = 0;
+        String base = "_";
+        String prefix = null;
+        boolean found = true;
+        while (found) {
+            count += 1;
+            prefix = base + count;
+            found = false;
+            for (NamespaceBinding binding : nsmap) {
+                found = found || prefix.equals(binding.getPrefix());
+            }
+        }
+
+        return prefix;
     }
 
     public Serializer makeSerializer() {
