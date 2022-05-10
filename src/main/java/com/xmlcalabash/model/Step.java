@@ -46,6 +46,11 @@ public class Step extends SourceArtifact {
     private static final QName cx_depend = new QName("cx",XProcConstants.NS_CALABASH_EX,"depend");
     private static final QName cx_depends = new QName("cx",XProcConstants.NS_CALABASH_EX,"depends");
     private static final QName cx_dependson = new QName("cx",XProcConstants.NS_CALABASH_EX,"dependson");
+    private static final QName cx_message = new QName("cx", XProcConstants.NS_CALABASH_EX, "message");
+
+    private static final String NS_DAISY_PIPELINE_XPROC = "http://www.daisy.org/ns/pipeline/xproc";
+    private static final QName px_message = new QName("px", NS_DAISY_PIPELINE_XPROC, "message");
+    private static final QName px_progress = new QName("px", NS_DAISY_PIPELINE_XPROC, "progress");
 
     protected QName stepType = null;
     protected String stepName = null;
@@ -151,6 +156,30 @@ public class Step extends SourceArtifact {
                     XProcException warning = new XProcException(
                         this,
                         "Pipeline was marked with cx:pure=\"true\" but contains impure steps");
+                    logger.warn(warning.toString());
+                }
+                pure = Optional.of(false);
+            } else if (getExtensionAttribute(cx_message) != null) {
+                if (pureAttr.orElse(false)) {
+                    XProcException warning = new XProcException(
+                        this,
+                        "Step was marked with cx:pure=\"true\" but is impure because it has a cx:message attribute");
+                    logger.warn(warning.toString());
+                }
+                pure = Optional.of(false);
+            } else if (getExtensionAttribute(px_message) != null) {
+                if (pureAttr.orElse(false)) {
+                    XProcException warning = new XProcException(
+                        this,
+                        "Step was marked with cx:pure=\"true\" but is impure because it has a px:message attribute");
+                    logger.warn(warning.toString());
+                }
+                pure = Optional.of(false);
+            } else if (getExtensionAttribute(px_progress) != null) {
+                if (pureAttr.orElse(false)) {
+                    XProcException warning = new XProcException(
+                        this,
+                        "Step was marked with cx:pure=\"true\" but is impure because it has a px:progress attribute");
                     logger.warn(warning.toString());
                 }
                 pure = Optional.of(false);
