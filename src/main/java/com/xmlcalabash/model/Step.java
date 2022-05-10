@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.Vector;
 import java.util.List;
+import java.util.Optional;
 
 import com.xmlcalabash.util.MessageFormatter;
 import net.sf.saxon.s9api.Axis;
@@ -49,7 +50,7 @@ public class Step extends SourceArtifact {
     protected QName stepType = null;
     protected String stepName = null;
     private boolean anonymous = false;
-    private Boolean pure = null;
+    private Optional<Boolean> pure = null;
     protected Vector<Input> inputs = new Vector<Input> ();
     protected Vector<Output> outputs = new Vector<Output> ();
     private Vector<Option> options = new Vector<Option> ();
@@ -131,9 +132,13 @@ public class Step extends SourceArtifact {
         return anonymous;
     }
 
-    public boolean isPure() {
+    public Optional<Boolean> isPure() {
         if (pure == null) {
-            pure = Boolean.parseBoolean(getExtensionAttribute(XProcConstants.cx_pure));
+            String attr = getExtensionAttribute(XProcConstants.cx_pure);
+            if (attr != null)
+                pure = Optional.of(Boolean.parseBoolean(attr));
+            else
+                pure = Optional.empty();
         }
         return pure;
     }

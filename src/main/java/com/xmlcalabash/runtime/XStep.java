@@ -10,6 +10,7 @@ import java.util.Hashtable;
 import java.util.Set;
 import java.util.HashSet;
 import java.util.Vector;
+import java.util.Optional;
 import javax.xml.transform.SourceLocator;
 
 import com.xmlcalabash.core.XProcException;
@@ -46,14 +47,13 @@ public abstract class XStep implements XProcRunnable {
     /* the next frames in the call stack */
     private static final SourceLocator[] EMPTY_LOCATION = new SourceLocator[]{};
     protected SourceLocator[] parentLocation = EMPTY_LOCATION;
-    private boolean runLazily = false;
+    private Boolean runLazily = null;
 
     public XStep(XProcRuntime runtime, Step step) {
         this.runtime = runtime;
         this.step = step;
         if (step != null) {
             name = step.getName();
-            runLazily = step.isPure();
         }
         logger = LoggerFactory.getLogger(this.getClass());
     }
@@ -303,6 +303,9 @@ public abstract class XStep implements XProcRunnable {
     public abstract void instantiate(Step step);
     public abstract void reset();
     public void run() throws SaxonApiException {
+        if (runLazily == null) {
+            runLazily = isPure().orElse(false);
+        }
         if (runLazily) {
             XProcRunnable runIfNotRunYet = new XProcRunnable() {
                     private boolean done = false;
@@ -323,6 +326,30 @@ public abstract class XStep implements XProcRunnable {
         }
     }
     protected abstract void doRun() throws SaxonApiException;
+
+    private Optional<Boolean> isPure() {
+        if (step != null) {
+            Optional<Boolean> pure = step.isPure();
+            DeclareStep decl = getDeclareStep();
+            if (decl != null) {
+                Optional<Boolean> declPure = decl.isPure();
+                if (declPure.isPresent()) {
+                    // cx:pure on step has precedence
+                    if (!pure.isPresent())
+                        return declPure;
+                    else if (pure.get() && !declPure.get()) {
+                        XProcException warning = new XProcException(
+                            this,
+                            "Step was marked with cx:pure=\"true\" but the corresponding declaration is impure");
+                        logger.warn(warning.toString());
+                    }
+                }
+            }
+            return pure;
+        } else {
+            return Optional.empty();
+        }
+    }
 
     public void error(XProcException error) {
         runtime.error(this, error);
