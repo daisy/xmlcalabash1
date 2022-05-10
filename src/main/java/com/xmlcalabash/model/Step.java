@@ -134,11 +134,29 @@ public class Step extends SourceArtifact {
 
     public Optional<Boolean> isPure() {
         if (pure == null) {
-            String attr = getExtensionAttribute(XProcConstants.cx_pure);
-            if (attr != null)
-                pure = Optional.of(Boolean.parseBoolean(attr));
-            else
-                pure = Optional.empty();
+            Optional<Boolean> pureAttr; {
+                String attr = getExtensionAttribute(XProcConstants.cx_pure);
+                pureAttr = attr != null ? Optional.of(Boolean.parseBoolean(attr)) : Optional.empty();
+            }
+            boolean containsImpureSteps = false; {
+                for (Step s : subpipeline) {
+                    if (!s.isPure().orElse(true)) {
+                        containsImpureSteps = true;
+                        break;
+                    }
+                }
+            }
+            if (containsImpureSteps) {
+                if (pureAttr.orElse(false)) {
+                    XProcException warning = new XProcException(
+                        this,
+                        "Pipeline was marked with cx:pure=\"true\" but contains impure steps");
+                    logger.warn(warning.toString());
+                }
+                pure = Optional.of(false);
+            } else {
+                pure = pureAttr;
+            }
         }
         return pure;
     }
