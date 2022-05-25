@@ -25,6 +25,7 @@ import java.util.HashSet;
 
 import com.xmlcalabash.core.XProcConstants;
 import com.xmlcalabash.util.MessageFormatter;
+import net.sf.saxon.om.TreeModel;
 import net.sf.saxon.s9api.*;
 import com.xmlcalabash.util.S9apiUtils;
 import com.xmlcalabash.core.XProcRuntime;
@@ -50,6 +51,7 @@ public class ReadableInline implements ReadablePipe {
         this.runtime = runtime;
         documents = new DocumentSequence(runtime);
         XdmDestination dest = new XdmDestination();
+        dest.setTreeModel(TreeModel.getTreeModel(runtime.getProcessor().getUnderlyingConfiguration().getTreeModel()));
         XdmNode p_inline = null;
 
         if (nodes.size() > 0) {

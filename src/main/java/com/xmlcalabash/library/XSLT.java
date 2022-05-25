@@ -43,6 +43,7 @@ import net.sf.saxon.lib.UnparsedTextURIResolver;
 import net.sf.saxon.om.NamespaceBindingSet;
 import net.sf.saxon.om.NodeName;
 import net.sf.saxon.om.StructuredQName;
+import net.sf.saxon.om.TreeModel;
 import net.sf.saxon.s9api.DocumentBuilder;
 import net.sf.saxon.s9api.MessageListener;
 import net.sf.saxon.s9api.Processor;
@@ -265,6 +266,7 @@ public class XSLT extends DefaultStep {
                 transformer.setDestination(serializer);
             } else {
                 result = new XdmDestination();
+                result.setTreeModel(TreeModel.getTreeModel(runtime.getProcessor().getUnderlyingConfiguration().getTreeModel()));
                 transformer.setDestination(result);
             }
 
@@ -462,6 +464,7 @@ public class XSLT extends DefaultStep {
 
             try {
                 XdmDestination xdmResult = new XdmDestination();
+                xdmResult.setTreeModel(TreeModel.getTreeModel(runtime.getProcessor().getUnderlyingConfiguration().getTreeModel()));
                 secondaryResults.put(baseURI.toASCIIString(), xdmResult);
                 Receiver receiver = xdmResult.getReceiver(runtime.getProcessor().getUnderlyingConfiguration());
                 return new FixedSysidReceiver(receiver, baseURI.toASCIIString());
