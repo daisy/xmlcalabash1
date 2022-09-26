@@ -64,6 +64,7 @@ public class DocumentSequence implements ReadableDocumentSequence {
     }
 
     public void close() {
+        if (closed) return;
         closed = true;
         if (outputlog != null) {
             outputlog.stopLogging();
