@@ -91,7 +91,7 @@ public class Error extends DefaultStep {
 
         QName errorCode = null;
         if (codeNameStr.contains(":")) {
-            errorCode = new QName(codeNameStr, codeNameValue.getNode());
+            errorCode = codeNameValue.getQName();
         } else {
             errorCode = new QName(cpfx == null ? "" : cpfx, cns, codeNameStr);
         }
