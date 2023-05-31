@@ -235,6 +235,14 @@ public class XProcException extends RuntimeException {
         return new DynamicXProcError(XProcConstants.stepError(code), location, message, null);
     }
 
+    public static XProcException stepError(int code, XStep location) {
+        return new DynamicXProcError(XProcConstants.stepError(code), location, null, null);
+    }
+
+    public static XProcException stepError(int code, XStep location, Throwable message) {
+        return new DynamicXProcError(XProcConstants.stepError(code), location, message, null);
+    }
+
     public XProcException(QName code, XdmNode location, String message) {
         this(code, location, message, null);
     }
