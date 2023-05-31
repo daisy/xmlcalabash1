@@ -863,7 +863,11 @@ public class XAtomicStep extends XStep {
 
         // Test to see if the option has a reasonable string value
         if (var.getTypeAsQName() != null) {
-            TypeUtils.checkType(runtime, value, stringValue, var.getTypeAsQName(), var.getNode());
+            try {
+                TypeUtils.checkType(runtime, value, stringValue, var.getTypeAsQName(), var.getNode());
+            } catch (XProcException e) {
+                throw new XProcException(e.getErrorCode(), this, e);
+            }
         } else if (var.getType() != null) {
             String type = var.getType();
             if (type.contains("|")) {
