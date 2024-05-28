@@ -402,6 +402,7 @@ ext.isReleaseVersion = !version.endsWith("SNAPSHOT")
 
 signing {
   required { isReleaseVersion && gradle.taskGraph.hasTask(":uploadArchives") }
+  useGpgCmd() // requires gpg2 to be installed
   sign configurations.archives
 }
 
